@@ -68,7 +68,7 @@ python -m pip install -e ".[test]"
 uvicorn shaktios_api.main:app --app-dir src --reload --port 8000
 ```
 
-Check `http://localhost:8000/health`. Events can be submitted to `POST http://localhost:8000/events`; see [docs/API.md](docs/API.md).
+Check `http://localhost:8000/health`. Events can be submitted to `POST http://localhost:8000/events` and read with `GET http://localhost:8000/events`; see [docs/API.md](docs/API.md).
 
 ## Run the simulator
 
