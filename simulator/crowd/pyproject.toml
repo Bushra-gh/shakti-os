@@ -1,0 +1,9 @@
+[project]
+name = "shaktios-crowd-simulator"
+version = "0.1.0"
+description = "Minimal local crowd event simulator"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+crowd-simulator = "shaktios_crowd_simulator.main:main"

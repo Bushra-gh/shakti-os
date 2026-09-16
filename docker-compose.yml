@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-shaktios}
+      POSTGRES_USER: ${POSTGRES_USER:-shaktios}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shaktios_dev}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - shaktios-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  shaktios-postgres-data:

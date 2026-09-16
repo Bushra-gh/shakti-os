@@ -1,0 +1,6 @@
+[project]
+name = "shaktios-civic-shield"
+version = "0.1.0"
+description = "Placeholder boundary for the Civic-Shield integration"
+requires-python = ">=3.11"
+dependencies = []

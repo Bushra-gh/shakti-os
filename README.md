@@ -1,159 +1,99 @@
-# Turborepo starter
+# SHAKTIOS
 
-This Turborepo starter is maintained by the Turborepo core team.
+ShaktiOS is an event-driven intelligence and response platform. Its planned flow is:
 
-## Using this example
-
-Run the following command:
-
-```sh
-npx create-turbo@latest
+```text
+Signals -> Events -> Signal Fusion -> Risk Assessment -> Incident -> Human-approved Action -> Audit / Timeline
 ```
 
-## What's inside?
+This repository is the bootstrap phase. It contains the architecture, development conventions, a minimal Next.js dashboard shell, a FastAPI health and event-ingestion API, shared frontend types, and a local crowd-event simulator. Product intelligence, risk, incidents, actions, WebSockets, authentication, and integrations are intentionally not implemented yet.
 
-This Turborepo includes the following packages/apps:
+## Repository structure
 
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `@next/eslint-plugin-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```text
+apps/dashboard/                 Next.js frontend
+services/api/                   FastAPI backend
+intelligence/civic-shield/      Civic-Shield integration placeholder
+simulator/crowd/                Deterministic event simulator
+packages/types/                 Shared TypeScript event types
+packages/config/                Shared configuration placeholder
+docs/                           Architecture and workflow documentation
 ```
 
-Without global `turbo`, use your package manager:
+The repository also retains the shared ESLint, TypeScript, and UI packages from the initial Turborepo setup.
 
-```sh
-cd my-turborepo
-npx turbo build
-pnpm exec turbo build
-pnpm exec turbo build
+## Prerequisites
+
+- Node.js 24+
+- pnpm 11+
+- Python 3.11+
+- Docker Desktop (only needed for PostgreSQL)
+
+## Setup
+
+```powershell
+pnpm install
+Copy-Item .env.example .env
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Start local PostgreSQL when needed:
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo build --filter=docs
+```powershell
+docker compose up -d
 ```
 
-Without global `turbo`:
+## Run the frontend
 
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+Run the dashboard through Turborepo:
+
+```powershell
+pnpm dev
 ```
 
-### Develop
+Or run it independently:
 
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
+```powershell
+pnpm --filter @shaktios/dashboard dev
 ```
 
-Without global `turbo`, use your package manager:
+Open `http://localhost:3000`.
 
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
+## Run the backend
+
+```powershell
+cd services/api
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[test]"
+uvicorn shaktios_api.main:app --app-dir src --reload --port 8000
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Check `http://localhost:8000/health`. Events can be submitted to `POST http://localhost:8000/events`; see [docs/API.md](docs/API.md).
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+## Run the simulator
 
-```sh
-turbo dev --filter=web
+```powershell
+cd simulator/crowd
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e .
+python -m shaktios_crowd_simulator.main
 ```
 
-Without global `turbo`:
+The simulator prints one event and does not send it to the API.
 
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+## Development commands
+
+```powershell
+pnpm dev
+pnpm build
+pnpm lint
+pnpm test
+pnpm check-types
 ```
 
-### Remote Caching
+Run API tests from `services/api` with `pytest` after installing the test extras.
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+## Git workflow
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+`main` is the stable branch. Use `feature/*`, `fix/*`, `docs/*`, or `chore/*` branches. Keep pull requests small, do not push directly to `main`, and avoid unrelated file changes. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).

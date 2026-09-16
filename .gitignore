@@ -27,6 +27,17 @@ out/
 build
 dist
 
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Local project environment
+.env.*
+!.env.example
+
 
 # Debug
 npm-debug.log*
