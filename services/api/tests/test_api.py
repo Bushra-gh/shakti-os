@@ -78,6 +78,57 @@ def test_event_creates_incident(client: TestClient) -> None:
     assert incidents[0]["factors"]["crowd_density"] == 0.42
 
 
+def test_incident_websocket_receives_created_incident(client: TestClient) -> None:
+    with client.websocket_connect("/ws/incidents") as websocket:
+        response = client.post(
+            "/events",
+            json=event_payload(timestamp="2026-09-19T12:00:00Z"),
+        )
+
+        message = websocket.receive_json()
+
+    assert response.status_code == 201
+    assert message["type"] == "incident.updated"
+    assert message["incident"]["location"] == "gate_4"
+    assert message["incident"]["risk"] == 0.168
+
+
+def test_event_websocket_receives_persisted_event(client: TestClient) -> None:
+    with client.websocket_connect("/ws/events") as websocket:
+        response = client.post(
+            "/events",
+            json=event_payload(timestamp="2026-09-19T12:00:00Z"),
+        )
+
+        message = websocket.receive_json()
+
+    assert response.status_code == 201
+    assert message["type"] == "event.created"
+    assert message["event"]["type"] == "crowd_density"
+    assert message["event"]["location"] == "gate_4"
+
+
+def test_incident_websocket_receives_updates_to_existing_incident(client: TestClient) -> None:
+    with client.websocket_connect("/ws/incidents") as websocket:
+        client.post(
+            "/events",
+            json=event_payload(timestamp="2026-09-19T12:00:00Z"),
+        )
+        websocket.receive_json()
+
+        social_event = event_payload(
+            event_type="social_concern",
+            timestamp="2026-09-19T12:01:00Z",
+        )
+        social_event["payload"] = {"velocity": 0.8}
+        client.post("/events", json=social_event)
+        message = websocket.receive_json()
+
+    assert message["type"] == "incident.updated"
+    assert message["incident"]["risk"] == 0.408
+    assert message["incident"]["severity"] == "MEDIUM"
+
+
 def test_related_event_updates_existing_incident(client: TestClient) -> None:
     first = client.post(
         "/events",

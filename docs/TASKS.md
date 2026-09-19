@@ -20,13 +20,14 @@
 
 ## Realtime
 
-- [ ] WebSocket event stream
-- [ ] WebSocket incident updates
+- [x] WebSocket event stream
+- [x] WebSocket incident updates
 
 ## Dashboard
 
 - [x] Incident list
 - [x] Incident detail
+- [x] Realtime incident updates
 - [ ] Map
 - [ ] Timeline
 

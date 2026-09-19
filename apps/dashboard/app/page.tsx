@@ -33,6 +33,8 @@ export default function Home() {
 
   useEffect(() => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+    const websocketUrl = apiUrl.replace(/^http/, "ws") + "/ws/incidents";
+    const websocket = new WebSocket(websocketUrl);
 
     fetch(`${apiUrl}/incidents?limit=20`)
       .then((response) => {
@@ -42,6 +44,20 @@ export default function Home() {
       .then(setIncidents)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
+
+    websocket.onmessage = (message) => {
+      const update = JSON.parse(message.data) as { type: string; incident: Incident };
+      if (update.type !== "incident.updated") return;
+      setIncidents((current) => {
+        const existing = current.some((incident) => incident.id === update.incident.id);
+        if (existing) {
+          return current.map((incident) => incident.id === update.incident.id ? update.incident : incident);
+        }
+        return [update.incident, ...current].slice(0, 20);
+      });
+    };
+
+    return () => websocket.close();
   }, []);
 
   return (

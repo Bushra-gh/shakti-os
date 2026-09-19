@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from shaktios_api.event_store import EventRecord, list_events, save_event
 from shaktios_api.incident_models import Incident
 from shaktios_api.incident_store import correlate_event, get_incident, list_incidents
 from shaktios_api.models import Event
+from shaktios_api.realtime import event_connections, incident_connections
 
 logger = logging.getLogger(__name__)
 
@@ -36,14 +37,38 @@ def health() -> dict[str, str]:
 
 
 @app.post("/events", response_model=Event, status_code=201)
-def ingest_event(event: Event, db: Session = Depends(get_db)) -> Event:
+async def ingest_event(event: Event, db: Session = Depends(get_db)) -> Event:
     persisted_event = save_event(db, event)
     event_record = db.get(EventRecord, persisted_event.id)
+    incident = None
     if event_record is not None:
-        correlate_event(db, persisted_event, event_record)
+        incident = correlate_event(db, persisted_event, event_record)
+    if incident is not None:
+        await incident_connections.broadcast(incident)
+    await event_connections.broadcast(persisted_event)
     normalized_event = persisted_event.model_dump(mode="json")
     logger.info("event_received", extra={"event": normalized_event})
     return persisted_event
+
+
+@app.websocket("/ws/incidents")
+async def incident_updates(websocket: WebSocket) -> None:
+    await incident_connections.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        incident_connections.disconnect(websocket)
+
+
+@app.websocket("/ws/events")
+async def event_updates(websocket: WebSocket) -> None:
+    await event_connections.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        event_connections.disconnect(websocket)
 
 
 @app.get("/events", response_model=list[Event])

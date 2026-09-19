@@ -26,8 +26,10 @@ export default function IncidentDetail({ params }: { params: Promise<{ incidentI
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    let websocket: WebSocket | undefined;
     params.then(({ incidentId }) => {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+      websocket = new WebSocket(`${apiUrl.replace(/^http/, "ws")}/ws/incidents`);
 
       fetch(`${apiUrl}/incidents/${incidentId}`)
         .then((response) => {
@@ -37,7 +39,16 @@ export default function IncidentDetail({ params }: { params: Promise<{ incidentI
         .then(setIncident)
         .catch(() => setError(true))
         .finally(() => setLoading(false));
+
+      websocket.onmessage = (message) => {
+        const update = JSON.parse(message.data) as { type: string; incident: Incident };
+        if (update.type === "incident.updated" && update.incident.id === incidentId) {
+          setIncident(update.incident);
+        }
+      };
     });
+
+    return () => websocket?.close();
   }, [params]);
 
   return (
