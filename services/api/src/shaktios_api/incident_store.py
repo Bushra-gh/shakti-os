@@ -14,6 +14,7 @@ from shaktios_api.incident_models import (
 )
 from shaktios_api.models import Event
 from shaktios_api.risk import calculate_risk
+from shaktios_api.timeline_store import add_timeline_entry
 
 RELEVANT_EVENT_TYPES = {
     "crowd_density",
@@ -87,6 +88,19 @@ def correlate_event(db: Session, event: Event, event_record: EventRecord) -> Inc
     incident.severity = severity.value
 
     event_record.incident_id = incident.id
+    add_timeline_entry(
+        db,
+        incident.id,
+        "event.correlated",
+        event.timestamp,
+        {
+            "event_id": event.id,
+            "event_type": event.type,
+            "source": event.source,
+            "risk": incident.risk,
+            "severity": incident.severity,
+        },
+    )
     db.commit()
     db.refresh(incident)
     return to_incident(incident)

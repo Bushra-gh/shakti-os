@@ -45,6 +45,28 @@ Returns incidents ordered by most recently updated. The optional `limit` paramet
 
 Returns one incident or `404` when it does not exist.
 
+## `GET /incidents/{incident_id}/timeline`
+
+Returns the incident's chronological timeline entries, oldest first. The optional `limit` defaults to `100`. A relevant event creates an `event.correlated` entry after it is associated with the incident.
+
+```json
+[
+  {
+    "id": "timeline-entry-id",
+    "incident_id": "incident-id",
+    "type": "event.correlated",
+    "timestamp": "2026-09-19T12:00:00Z",
+    "details": {
+      "event_id": "event-id",
+      "event_type": "crowd_density",
+      "source": "crowd_simulator",
+      "risk": 0.168,
+      "severity": "LOW"
+    }
+  }
+]
+```
+
 ## `WS /ws/incidents`
 
 Streams incident updates from the current API process. The connection remains open until the client disconnects. When an event creates or updates an incident, subscribers receive:
@@ -120,6 +142,16 @@ The API also creates the `incidents` table:
 | `factors` | `JSON` | Required, explainable contributions |
 | `created_at` | `TIMESTAMP WITH TIME ZONE` | Required |
 | `updated_at` | `TIMESTAMP WITH TIME ZONE` | Required |
+
+The API also creates the `incident_timeline` table:
+
+| Column | Type | Constraints |
+| --- | --- | --- |
+| `id` | `VARCHAR(36)` | Primary key |
+| `incident_id` | `VARCHAR(36)` | Required, indexed |
+| `type` | `VARCHAR(64)` | Required |
+| `timestamp` | `TIMESTAMP WITH TIME ZONE` | Required |
+| `details` | `JSON` | Required |
 
 Incidents also expose the current explainable risk state:
 

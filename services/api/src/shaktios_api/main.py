@@ -11,6 +11,8 @@ from shaktios_api.incident_models import Incident
 from shaktios_api.incident_store import correlate_event, get_incident, list_incidents
 from shaktios_api.models import Event
 from shaktios_api.realtime import event_connections, incident_connections
+from shaktios_api.timeline_models import TimelineEntry
+from shaktios_api.timeline_store import list_timeline_entries
 
 logger = logging.getLogger(__name__)
 
@@ -93,3 +95,14 @@ def get_incident_by_id(incident_id: str, db: Session = Depends(get_db)) -> Incid
     if incident is None:
         raise HTTPException(status_code=404, detail="Incident not found")
     return incident
+
+
+@app.get("/incidents/{incident_id}/timeline", response_model=list[TimelineEntry])
+def get_incident_timeline(
+    incident_id: str,
+    limit: int = Query(default=100, ge=1),
+    db: Session = Depends(get_db),
+) -> list[TimelineEntry]:
+    if get_incident(db, incident_id) is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return list_timeline_entries(db, incident_id, limit)

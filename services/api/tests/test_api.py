@@ -8,6 +8,7 @@ os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 from shaktios_api.database import SessionLocal
 from shaktios_api.event_store import EventRecord
 from shaktios_api.incident_store import IncidentRecord
+from shaktios_api.timeline_store import TimelineEntryRecord
 from shaktios_api.main import app
 
 
@@ -17,6 +18,7 @@ def client() -> TestClient:
         with SessionLocal() as db:
             db.query(EventRecord).delete()
             db.query(IncidentRecord).delete()
+            db.query(TimelineEntryRecord).delete()
             db.commit()
         yield test_client
 
@@ -219,6 +221,35 @@ def test_get_incident_by_id(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json()["id"] == incident["id"]
+
+
+def test_incident_timeline_records_correlated_events(client: TestClient) -> None:
+    client.post(
+        "/events",
+        json=event_payload(timestamp="2026-09-19T12:00:00Z"),
+    )
+    social_event = event_payload(
+        event_type="social_concern",
+        timestamp="2026-09-19T12:01:00Z",
+    )
+    social_event["payload"] = {"velocity": 0.8}
+    client.post("/events", json=social_event)
+    incident = client.get("/incidents").json()[0]
+
+    response = client.get(f"/incidents/{incident['id']}/timeline")
+
+    assert response.status_code == 200
+    entries = response.json()
+    assert len(entries) == 2
+    assert [entry["type"] for entry in entries] == ["event.correlated", "event.correlated"]
+    assert entries[0]["timestamp"].startswith("2026-09-19T12:00:00")
+    assert entries[1]["details"]["event_type"] == "social_concern"
+
+
+def test_missing_incident_timeline_returns_not_found(client: TestClient) -> None:
+    response = client.get("/incidents/missing/timeline")
+
+    assert response.status_code == 404
 
 
 def test_get_missing_incident_returns_not_found(client: TestClient) -> None:

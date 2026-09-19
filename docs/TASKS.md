@@ -29,7 +29,7 @@
 - [x] Incident detail
 - [x] Realtime incident updates
 - [ ] Map
-- [ ] Timeline
+- [x] Timeline
 
 ## Intelligence
 
