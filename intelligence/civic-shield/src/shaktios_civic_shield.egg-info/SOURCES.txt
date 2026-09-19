@@ -1,0 +1,10 @@
+README.md
+pyproject.toml
+src/civic_shield/__init__.py
+src/civic_shield/adapter.py
+src/shaktios_civic_shield.egg-info/PKG-INFO
+src/shaktios_civic_shield.egg-info/SOURCES.txt
+src/shaktios_civic_shield.egg-info/dependency_links.txt
+src/shaktios_civic_shield.egg-info/requires.txt
+src/shaktios_civic_shield.egg-info/top_level.txt
+tests/test_adapter.py

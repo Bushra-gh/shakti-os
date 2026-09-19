@@ -34,7 +34,7 @@
 
 ## Intelligence
 
-- [ ] Civic-Shield adapter
+- [x] Civic-Shield adapter
 - [ ] Citizen report adapter
 
 ## Response
