@@ -1,0 +1,5 @@
+- PostgreSQL is the production database.
+- Use the existing SQLAlchemy setup.
+- Do not change existing schema without checking dependent code.
+- Database changes require tests.
+- Never delete data/schema casually.

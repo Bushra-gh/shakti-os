@@ -1,0 +1,6 @@
+- Use FastAPI/Pydantic/SQLAlchemy conventions already present.
+- Keep route handlers thin.
+- Put domain logic outside HTTP routes.
+- Validate input at API boundaries.
+- Add tests for new API behavior.
+- Do not introduce a second persistence abstraction.

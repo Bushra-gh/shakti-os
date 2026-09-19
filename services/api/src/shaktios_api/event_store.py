@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, Float, JSON, String
+from sqlalchemy import DateTime, Float, ForeignKey, JSON, String
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from shaktios_api.database import Base
@@ -18,6 +18,9 @@ class EventRecord(Base):
     location: Mapped[str] = mapped_column(String(255), nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    incident_id: Mapped[str | None] = mapped_column(
+        ForeignKey("incidents.id"), nullable=True
+    )
 
 
 def save_event(db: Session, event: Event) -> Event:

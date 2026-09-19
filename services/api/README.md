@@ -1,6 +1,6 @@
 # ShaktiOS API
 
-Minimal FastAPI service. It currently exposes only `GET /health`.
+FastAPI service for the Event, Incident, and explainable Risk foundation. It exposes `GET /health`, Event ingestion/listing, and Incident listing/detail endpoints.
 
 ```powershell
 python -m venv .venv

@@ -7,6 +7,7 @@ os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 
 from shaktios_api.database import SessionLocal
 from shaktios_api.event_store import EventRecord
+from shaktios_api.incident_store import IncidentRecord
 from shaktios_api.main import app
 
 
@@ -15,18 +16,26 @@ def client() -> TestClient:
     with TestClient(app) as test_client:
         with SessionLocal() as db:
             db.query(EventRecord).delete()
+            db.query(IncidentRecord).delete()
             db.commit()
         yield test_client
 
 
-def event_payload(event_type: str = "crowd_density") -> dict[str, object]:
-    return {
+def event_payload(
+    event_type: str = "crowd_density",
+    location: str = "gate_4",
+    timestamp: str | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
         "type": event_type,
         "source": "crowd_simulator",
-        "location": "gate_4",
+        "location": location,
         "confidence": 0.95,
         "payload": {"density": 0.42},
     }
+    if timestamp is not None:
+        payload["timestamp"] = timestamp
+    return payload
 
 
 def test_health(client: TestClient) -> None:
@@ -50,6 +59,121 @@ def test_event_is_persisted(client: TestClient) -> None:
     assert record is not None
     assert record.type == "crowd_density"
     assert record.payload == {"density": 0.42}
+
+
+def test_event_creates_incident(client: TestClient) -> None:
+    response = client.post(
+        "/events",
+        json=event_payload(timestamp="2026-09-19T12:00:00Z"),
+    )
+
+    assert response.status_code == 201
+    incidents = client.get("/incidents").json()
+    assert len(incidents) == 1
+    assert incidents[0]["type"] == "crowd_risk"
+    assert incidents[0]["location"] == "gate_4"
+    assert incidents[0]["status"] == "DETECTED"
+    assert incidents[0]["risk"] == 0.168
+    assert incidents[0]["severity"] == "LOW"
+    assert incidents[0]["factors"]["crowd_density"] == 0.42
+
+
+def test_related_event_updates_existing_incident(client: TestClient) -> None:
+    first = client.post(
+        "/events",
+        json=event_payload(timestamp="2026-09-19T12:00:00Z"),
+    )
+    first_incident = client.get("/incidents").json()[0]
+
+    second_payload = event_payload(
+        event_type="abnormal_movement",
+        timestamp="2026-09-19T12:02:00Z",
+    )
+    second_payload["confidence"] = 0.99
+    second = client.post("/events", json=second_payload)
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    incidents = client.get("/incidents").json()
+    assert len(incidents) == 1
+    assert incidents[0]["id"] == first_incident["id"]
+    assert incidents[0]["confidence"] == 0.99
+
+
+def test_risk_keeps_explainable_contributing_factors(client: TestClient) -> None:
+    client.post(
+        "/events",
+        json=event_payload(timestamp="2026-09-19T12:00:00Z"),
+    )
+    social_event = event_payload(
+        event_type="social_concern",
+        timestamp="2026-09-19T12:01:00Z",
+    )
+    social_event["payload"] = {"velocity": 0.8}
+    client.post("/events", json=social_event)
+
+    incident = client.get("/incidents").json()[0]
+
+    assert incident["factors"] == {
+        "crowd_density": 0.42,
+        "social_velocity": 0.8,
+        "abnormal_movement": 0.0,
+        "citizen_reports": 0.0,
+        "citizen_report_count": 0,
+    }
+    assert incident["risk"] == 0.408
+    assert incident["severity"] == "MEDIUM"
+
+
+def test_unrelated_location_does_not_affect_incident(client: TestClient) -> None:
+    client.post(
+        "/events",
+        json=event_payload(timestamp="2026-09-19T12:00:00Z"),
+    )
+    client.post(
+        "/events",
+        json=event_payload(location="gate_9", timestamp="2026-09-19T12:01:00Z"),
+    )
+
+    incidents = client.get("/incidents").json()
+    assert len(incidents) == 2
+    assert {incident["location"] for incident in incidents} == {"gate_4", "gate_9"}
+
+
+def test_old_event_does_not_attach_to_active_incident(client: TestClient) -> None:
+    first = client.post(
+        "/events",
+        json=event_payload(timestamp="2026-09-19T12:10:00Z"),
+    )
+    old_event = client.post(
+        "/events",
+        json=event_payload(timestamp="2026-09-19T11:00:00Z"),
+    )
+
+    assert old_event.status_code == 201
+    incidents = client.get("/incidents").json()
+    assert len(incidents) == 2
+    first_incident = next(
+        incident for incident in incidents if incident["location"] == "gate_4"
+    )
+    assert first.status_code == 201
+    assert first_incident["updated_at"].startswith("2026-09-19T12:10:00")
+
+
+def test_get_incident_by_id(client: TestClient) -> None:
+    client.post("/events", json=event_payload())
+    incident = client.get("/incidents").json()[0]
+
+    response = client.get(f"/incidents/{incident['id']}")
+
+    assert response.status_code == 200
+    assert response.json()["id"] == incident["id"]
+
+
+def test_get_missing_incident_returns_not_found(client: TestClient) -> None:
+    response = client.get("/incidents/missing")
+
+    assert response.status_code == 404
 
 
 def test_get_events_returns_persisted_events(client: TestClient) -> None:

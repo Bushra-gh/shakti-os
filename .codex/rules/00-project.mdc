@@ -1,0 +1,12 @@
+---
+description: Core ShaktiOS project rules
+alwaysApply: true
+---
+
+- Keep implementation simple.
+- Prefer existing project patterns.
+- Do not introduce new dependencies without justification.
+- Do not modify unrelated files.
+- Do not invent APIs or domain concepts.
+- Preserve backwards compatibility unless the task explicitly changes it.
+- Validate changes before declaring the task complete.

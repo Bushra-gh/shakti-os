@@ -1,0 +1,10 @@
+apps/dashboard/**/*.ts
+apps/dashboard/**/*.tsx
+
+- Use TypeScript.
+- Use existing shadcn/ui components before creating new primitives.
+- Keep components focused.
+- Prefer server/client boundaries already established in the app.
+- Do not add another state-management library.
+- Follow existing Tailwind conventions.
+- Run typecheck/lint after changes.

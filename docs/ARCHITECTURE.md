@@ -6,4 +6,4 @@ ShaktiOS is planned as one simple event-driven platform:
 Sources -> Adapters -> Events -> Intelligence -> Signal Fusion -> Risk Engine -> Incident Engine -> Action -> Dashboard
 ```
 
-The initial repository only provides the dashboard shell, a health-check API, shared frontend types, and a deterministic simulator. The remaining stages are intentionally placeholders until their contracts are designed.
+Current implementation covers the Event and Incident stages plus a deterministic correlation boundary. Risk calculation is the next backend milestone. Realtime delivery, the dashboard command center, source adapters, human approval, and actions remain intentionally incremental.
