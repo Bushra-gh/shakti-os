@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { apiUrl, getEvents, getIncidents, websocketUrl, type Event, type Incident } from "@/lib/api";
+import { subscribeWithReconnect, type ConnectionState } from "@/lib/realtime";
 import styles from "./page.module.css";
 
 const gatePositions: Record<string, { left: string; top: string }> = {
@@ -31,7 +32,8 @@ export default function Home() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [connectionState, setConnectionState] = useState("CONNECTING");
+  const [incidentConnection, setIncidentConnection] = useState<ConnectionState>("CONNECTING");
+  const [eventConnection, setEventConnection] = useState<ConnectionState>("CONNECTING");
   const [eventType, setEventType] = useState("crowd_density");
   const [eventLocation, setEventLocation] = useState("gate_4");
   const [sendingEvent, setSendingEvent] = useState(false);
@@ -53,12 +55,8 @@ export default function Home() {
       .catch(() => setError(true))
       .finally(() => setLoading(false));
 
-    const incidentSocket = new WebSocket(websocketUrl("/ws/incidents"));
-    incidentSocket.onopen = () => setConnectionState("LIVE");
-    incidentSocket.onclose = () => setConnectionState("DISCONNECTED");
-    incidentSocket.onerror = () => setConnectionState("DISCONNECTED");
-    incidentSocket.onmessage = (message) => {
-      const update = JSON.parse(message.data) as { type: string; incident: Incident };
+    const stopIncidentStream = subscribeWithReconnect(websocketUrl("/ws/incidents"), (data) => {
+      const update = JSON.parse(data) as { type: string; incident: Incident };
       if (update.type !== "incident.updated") return;
       setIncidents((current) => {
         const next = current.some((incident) => incident.id === update.incident.id)
@@ -66,17 +64,16 @@ export default function Home() {
           : [update.incident, ...current];
         return next.sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 50);
       });
-    };
+    }, setIncidentConnection);
 
-    const eventSocket = new WebSocket(websocketUrl("/ws/events"));
-    eventSocket.onmessage = (message) => {
-      const update = JSON.parse(message.data) as { type: string; event: Event };
+    const stopEventStream = subscribeWithReconnect(websocketUrl("/ws/events"), (data) => {
+      const update = JSON.parse(data) as { type: string; event: Event };
       if (update.type === "event.created") setEvents((current) => [update.event, ...current].slice(0, 50));
-    };
+    }, setEventConnection);
 
     return () => {
-      incidentSocket.close();
-      eventSocket.close();
+      stopIncidentStream();
+      stopEventStream();
     };
   }, []);
 
@@ -115,7 +112,7 @@ export default function Home() {
     <main className={styles.page}>
       <header className={styles.topbar}>
         <div><p className={styles.eyebrow}>Operational command center / 02</p><h1>SHAKTIOS</h1></div>
-        <div className={styles.connection}><span className={`${styles.liveDot} ${connectionState === "DISCONNECTED" ? styles.offlineDot : ""}`} /> {connectionState} / {apiUrl.replace(/^https?:\/\//, "")}</div>
+        <div className={styles.connection}><span className={`${styles.liveDot} ${incidentConnection !== "LIVE" || eventConnection !== "LIVE" ? styles.offlineDot : ""}`} /> INCIDENTS {incidentConnection} / EVENTS {eventConnection}</div>
       </header>
       <div className={styles.rule} />
       <section className={styles.metrics}>

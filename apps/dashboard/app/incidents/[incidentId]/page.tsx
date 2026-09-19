@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { apiUrl, getTimeline, websocketUrl, type Incident, type TimelineEntry } from "@/lib/api";
+import { subscribeWithReconnect, type ConnectionState } from "@/lib/realtime";
 import styles from "./page.module.css";
 
 export default function IncidentDetail({ params }: { params: Promise<{ incidentId: string }> }) {
@@ -23,12 +24,18 @@ export default function IncidentDetail({ params }: { params: Promise<{ incidentI
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [actionType, setActionType] = useState("notify_operator");
   const [actionState, setActionState] = useState<"idle" | "sending" | "accepted" | "error">("idle");
+  const [connectionState, setConnectionState] = useState<ConnectionState>("CONNECTING");
 
   useEffect(() => {
-    let websocket: WebSocket | undefined;
+    let stopStream: (() => void) | undefined;
     params.then(({ incidentId }) => {
       setIncidentId(incidentId);
-      websocket = new WebSocket(websocketUrl("/ws/incidents"));
+      stopStream = subscribeWithReconnect(websocketUrl("/ws/incidents"), (data) => {
+        const update = JSON.parse(data) as { type: string; incident: Incident };
+        if (update.type === "incident.updated" && update.incident.id === incidentId) {
+          setIncident(update.incident);
+        }
+      }, setConnectionState);
 
       fetch(`${apiUrl}/incidents/${incidentId}`)
         .then((response) => {
@@ -43,15 +50,9 @@ export default function IncidentDetail({ params }: { params: Promise<{ incidentI
         .then(setTimeline)
         .catch(() => setTimelineError(true));
 
-      websocket.onmessage = (message) => {
-        const update = JSON.parse(message.data) as { type: string; incident: Incident };
-        if (update.type === "incident.updated" && update.incident.id === incidentId) {
-          setIncident(update.incident);
-        }
-      };
     });
 
-    return () => websocket?.close();
+    return () => stopStream?.();
     }, [params]);
 
   const approveStatus = async (status: string) => {
@@ -108,7 +109,7 @@ export default function IncidentDetail({ params }: { params: Promise<{ incidentI
                 <h1>{incident.type.replaceAll("_", " ")}</h1>
                 <p className={styles.location}>{incident.location}</p>
               </div>
-              <Badge variant="outline">{incident.status}</Badge>
+              <div className={styles.headerMeta}><Badge variant="outline">{incident.status}</Badge><span className={styles.streamState}>{connectionState}</span></div>
             </header>
             {incident.status !== "RESOLVED" && (
               <Card className={styles.approvalCard}>

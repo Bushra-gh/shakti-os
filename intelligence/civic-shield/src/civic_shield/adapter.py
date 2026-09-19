@@ -1,6 +1,8 @@
 from collections.abc import Mapping
 from typing import Any
 
+import httpx
+
 
 def _bounded_confidence(value: object) -> float:
     try:
@@ -57,3 +59,14 @@ class CivicShieldAdapter:
             "confidence": _bounded_confidence(confidence),
             "payload": payload,
         }
+
+    async def send_event(self, signal: Mapping[str, Any], api_url: str) -> dict[str, Any]:
+        event = self.to_event(signal)
+        endpoint = f"{api_url.rstrip('/')}/events"
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(endpoint, json=event)
+                response.raise_for_status()
+                return response.json()
+        except httpx.HTTPError as error:
+            raise RuntimeError(f"Could not deliver Civic-Shield event to {endpoint}: {error}") from error

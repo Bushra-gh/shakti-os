@@ -1,6 +1,12 @@
 # ShaktiOS API
 
-FastAPI service for the Event, Incident, and explainable Risk foundation. It exposes `GET /health`, Event ingestion/listing, and Incident listing/detail endpoints.
+FastAPI service for Event, Incident, explainable Risk, realtime updates, timeline, approval, and action handoff workflows.
+
+Run the additive schema command before starting the server when using an existing database:
+
+```powershell
+python -m shaktios_api.migrate
+```
 
 ```powershell
 python -m venv .venv

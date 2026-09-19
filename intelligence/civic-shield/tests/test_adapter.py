@@ -1,4 +1,6 @@
+import asyncio
 import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from civic_shield.adapter import CivicShieldAdapter
 
@@ -45,3 +47,19 @@ def test_civic_shield_adapter_prefers_explicit_confidence() -> None:
 def test_civic_shield_adapter_requires_location() -> None:
     with pytest.raises(ValueError, match="requires location"):
         CivicShieldAdapter().to_event({"mention_count": 2})
+
+
+def test_civic_shield_adapter_sends_normalized_event() -> None:
+    response = MagicMock()
+    response.json.return_value = {"id": "event-1"}
+    client = AsyncMock()
+    client.__aenter__.return_value.post.return_value = response
+    signal = {"region": "Delhi", "mention_count": 42}
+
+    with patch("civic_shield.adapter.httpx.AsyncClient", return_value=client):
+        result = asyncio.run(CivicShieldAdapter().send_event(signal, "http://localhost:8000/"))
+
+    client.__aenter__.return_value.post.assert_awaited_once_with(
+        "http://localhost:8000/events", json=CivicShieldAdapter().to_event(signal)
+    )
+    assert result == {"id": "event-1"}

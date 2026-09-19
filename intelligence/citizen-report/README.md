@@ -14,4 +14,4 @@ event = CitizenReportAdapter().to_event({
 })
 ```
 
-Send the returned payload to ShaktiOS `POST /events`. Reporter identity is intentionally not forwarded in the normalized event payload.
+Call `send_event(report, api_url)` to deliver the normalized payload to ShaktiOS `POST /events`. Reporter identity is intentionally not forwarded in the normalized event payload.

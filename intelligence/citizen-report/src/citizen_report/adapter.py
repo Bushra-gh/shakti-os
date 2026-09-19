@@ -1,6 +1,8 @@
 from collections.abc import Mapping
 from typing import Any
 
+import httpx
+
 
 def _confidence(value: object) -> float:
     try:
@@ -39,3 +41,14 @@ class CitizenReportAdapter:
             "confidence": _confidence(report.get("confidence")),
             "payload": payload,
         }
+
+    async def send_event(self, report: Mapping[str, Any], api_url: str) -> dict[str, Any]:
+        event = self.to_event(report)
+        endpoint = f"{api_url.rstrip('/')}/events"
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(endpoint, json=event)
+                response.raise_for_status()
+                return response.json()
+        except httpx.HTTPError as error:
+            raise RuntimeError(f"Could not deliver citizen report to {endpoint}: {error}") from error

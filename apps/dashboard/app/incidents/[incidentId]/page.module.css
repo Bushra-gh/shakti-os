@@ -3,6 +3,8 @@
 .backLink, .eyebrow, .location, .timestamps { color: var(--muted); font-family: var(--font-geist-mono), monospace; font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
 .backLink { display: inline-block; margin-bottom: 56px; color: var(--accent-dark); }
 .header { display: flex; align-items: start; justify-content: space-between; gap: 24px; margin-bottom: 36px; }
+.headerMeta { display: flex; align-items: center; gap: 12px; }
+.streamState { color: var(--muted); font: .65rem var(--font-geist-mono), monospace; letter-spacing: .08em; }
 .eyebrow { color: var(--accent-dark); }
 .header h1 { margin: 12px 0 8px; font-size: clamp(2.5rem, 8vw, 5rem); line-height: .95; text-transform: capitalize; letter-spacing: -.05em; }
 .location { font-size: .85rem; }

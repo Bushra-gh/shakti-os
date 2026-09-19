@@ -1,4 +1,6 @@
+import asyncio
 import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from citizen_report import CitizenReportAdapter
 
@@ -42,3 +44,19 @@ def test_citizen_report_defaults_confidence_and_optional_fields() -> None:
 def test_citizen_report_requires_location_and_text(report: dict[str, str]) -> None:
     with pytest.raises(ValueError):
         CitizenReportAdapter().to_event(report)
+
+
+def test_citizen_report_adapter_sends_normalized_event() -> None:
+    response = MagicMock()
+    response.json.return_value = {"id": "event-2"}
+    client = AsyncMock()
+    client.__aenter__.return_value.post.return_value = response
+    report = {"location": "gate_4", "text": "Crowd at entrance."}
+
+    with patch("citizen_report.adapter.httpx.AsyncClient", return_value=client):
+        result = asyncio.run(CitizenReportAdapter().send_event(report, "http://localhost:8000"))
+
+    client.__aenter__.return_value.post.assert_awaited_once_with(
+        "http://localhost:8000/events", json=CitizenReportAdapter().to_event(report)
+    )
+    assert result == {"id": "event-2"}

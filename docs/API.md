@@ -179,6 +179,10 @@ The API also creates the `incident_timeline` table:
 | `timestamp` | `TIMESTAMP WITH TIME ZONE` | Required |
 | `details` | `JSON` | Required |
 
+## Schema changes
+
+Run `python -m shaktios_api.migrate` from `services/api` after installing the API package. This command is idempotent and creates missing tables/indexes from SQLAlchemy metadata. It does not modify existing columns or constraints. Future non-additive schema changes require an explicit reviewed migration or a documented local PostgreSQL reset; `create_all` is not a replacement for column migrations.
+
 Incidents also expose the current explainable risk state:
 
 ```json
