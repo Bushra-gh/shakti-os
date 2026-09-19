@@ -1,119 +1,119 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { type Event } from "@shaktios/types";
+import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { apiUrl, getEvents, getIncidents, websocketUrl, type Event, type Incident } from "@/lib/api";
 import styles from "./page.module.css";
 
-type Incident = {
-  id: string;
-  type: string;
-  location: string;
-  status: string;
-  severity: string;
-  confidence: number;
-  risk: number;
-  updated_at: string;
+const gatePositions: Record<string, { left: string; top: string }> = {
+  gate_1: { left: "18%", top: "28%" },
+  gate_2: { left: "72%", top: "24%" },
+  gate_3: { left: "78%", top: "72%" },
+  gate_4: { left: "26%", top: "70%" },
+  gate_9: { left: "50%", top: "48%" },
 };
 
-const previewEvent: Event = {
-  id: "evt_preview_001",
-  type: "crowd_density",
-  source: "crowd_simulator",
-  timestamp: "2026-09-16T09:42:00Z",
-  location: "gate_4",
-  confidence: 0.95,
-  payload: { density: 0.42 },
-};
+function formatLabel(value: string): string {
+  return value.replaceAll("_", " ");
+}
+
+function severityClass(severity: string): string {
+  return styles[severity.toLowerCase()] ?? "";
+}
 
 export default function Home() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-    const websocketUrl = apiUrl.replace(/^http/, "ws") + "/ws/incidents";
-    const websocket = new WebSocket(websocketUrl);
-
-    fetch(`${apiUrl}/incidents?limit=20`)
-      .then((response) => {
-        if (!response.ok) throw new Error("Incident request failed");
-        return response.json() as Promise<Incident[]>;
+    Promise.all([
+      fetch(`${apiUrl}/health`).then((response) => {
+        if (!response.ok) throw new Error("Health request failed");
+        return response.json() as Promise<{ status: string }>;
+      }),
+      getIncidents(),
+      getEvents(),
+    ])
+      .then(([, nextIncidents, nextEvents]) => {
+        setIncidents(nextIncidents);
+        setEvents(nextEvents);
       })
-      .then(setIncidents)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
 
-    websocket.onmessage = (message) => {
+    const incidentSocket = new WebSocket(websocketUrl("/ws/incidents"));
+    incidentSocket.onmessage = (message) => {
       const update = JSON.parse(message.data) as { type: string; incident: Incident };
       if (update.type !== "incident.updated") return;
       setIncidents((current) => {
-        const existing = current.some((incident) => incident.id === update.incident.id);
-        if (existing) {
-          return current.map((incident) => incident.id === update.incident.id ? update.incident : incident);
-        }
-        return [update.incident, ...current].slice(0, 20);
+        const next = current.some((incident) => incident.id === update.incident.id)
+          ? current.map((incident) => incident.id === update.incident.id ? update.incident : incident)
+          : [update.incident, ...current];
+        return next.sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 50);
       });
     };
 
-    return () => websocket.close();
+    const eventSocket = new WebSocket(websocketUrl("/ws/events"));
+    eventSocket.onmessage = (message) => {
+      const update = JSON.parse(message.data) as { type: string; event: Event };
+      if (update.type === "event.created") setEvents((current) => [update.event, ...current].slice(0, 50));
+    };
+
+    return () => {
+      incidentSocket.close();
+      eventSocket.close();
+    };
   }, []);
+
+  const activeIncidents = incidents.filter((incident) => incident.status !== "RESOLVED");
+  const criticalCount = activeIncidents.filter((incident) => ["HIGH", "CRITICAL"].includes(incident.severity)).length;
+  const mapIncidents = useMemo(() => activeIncidents.slice(0, 8), [activeIncidents]);
 
   return (
     <main className={styles.page}>
-      <section className={styles.hero}>
-        <div className={styles.eyebrow}>Operational preview / 01</div>
-        <h1>SHAKTIOS</h1>
-        <p className={styles.subtitle}>Event-Driven Intelligence &amp; Response Platform</p>
-        <div className={styles.rule} />
-        <div className={styles.contentGrid}>
-          <div>
-            <p className={styles.kicker}>The signal layer is taking shape.</p>
-            <p className={styles.description}>
-              A focused workspace for turning real-world signals into clear, accountable response.
-              The command center arrives incrementally.
-            </p>
-          </div>
-          <div className={styles.eventPanel}>
-            <div className={styles.panelHeader}>
-              <span>Latest signal</span>
-              <span className={styles.status}>STAGED</span>
+      <header className={styles.topbar}>
+        <div><p className={styles.eyebrow}>Operational command center / 02</p><h1>SHAKTIOS</h1></div>
+        <div className={styles.connection}><span className={styles.liveDot} /> LIVE / {apiUrl.replace(/^https?:\/\//, "")}</div>
+      </header>
+      <div className={styles.rule} />
+      <section className={styles.metrics}>
+        <Card><CardHeader><CardTitle>Active incidents</CardTitle></CardHeader><CardContent className={styles.metric}>{activeIncidents.length.toString().padStart(2, "0")}</CardContent></Card>
+        <Card><CardHeader><CardTitle>Elevated risk</CardTitle></CardHeader><CardContent className={`${styles.metric} ${criticalCount ? styles.alertMetric : ""}`}>{criticalCount.toString().padStart(2, "0")}</CardContent></Card>
+        <Card><CardHeader><CardTitle>Signals / latest 50</CardTitle></CardHeader><CardContent className={styles.metric}>{events.length.toString().padStart(2, "0")}</CardContent></Card>
+      </section>
+      {error && <p className={styles.error}>API unavailable. Start the ShaktiOS API to connect the command center.</p>}
+      <section className={styles.workspace}>
+        <Card className={styles.mapCard}>
+          <CardHeader><CardTitle>Location overview</CardTitle><p className={styles.cardMeta}>Live incident positions / named gates</p></CardHeader>
+          <CardContent>
+            <div className={styles.map}>
+              <div className={`${styles.mapRoad} ${styles.roadHorizontal}`} /><div className={`${styles.mapRoad} ${styles.roadVertical}`} />
+              <span className={styles.mapLabel}>NORTH PLAZA</span><span className={`${styles.mapLabel} ${styles.southLabel}`}>SOUTH ACCESS</span>
+              {mapIncidents.map((incident) => {
+                const position = gatePositions[incident.location] ?? { left: "50%", top: "50%" };
+                return <Link key={incident.id} href={`/incidents/${incident.id}`} className={`${styles.mapMarker} ${severityClass(incident.severity)}`} style={position} title={`${formatLabel(incident.location)} / ${incident.severity}`}><span />{formatLabel(incident.location)}</Link>;
+              })}
+              {mapIncidents.length === 0 && <p className={styles.mapEmpty}>No active incidents to plot.</p>}
             </div>
-            <pre>{JSON.stringify(previewEvent, null, 2)}</pre>
-          </div>
-        </div>
-        <section className={styles.incidentSection}>
-          <div className={styles.sectionHeader}>
-            <div>
-              <div className={styles.kicker}>Situation awareness</div>
-              <h2>Active incidents</h2>
-            </div>
-            <span className={styles.count}>{incidents.length.toString().padStart(2, "0")}</span>
-          </div>
-          {loading && <p className={styles.message}>Loading incidents...</p>}
-          {error && <p className={styles.message}>API unavailable. Start the ShaktiOS API to view incidents.</p>}
-          {!loading && !error && incidents.length === 0 && (
-            <p className={styles.message}>No incidents have been detected yet.</p>
-          )}
-          {!loading && !error && incidents.length > 0 && (
-            <div className={styles.incidentList}>
-              {incidents.map((incident) => (
-                <Link className={styles.incidentRow} href={`/incidents/${incident.id}`} key={incident.id}>
-                  <div>
-                    <h3>{incident.type.replaceAll("_", " ")}</h3>
-                    <p>{incident.location} / updated {new Date(incident.updated_at).toLocaleTimeString()}</p>
-                  </div>
-                  <div className={styles.incidentMeta}>
-                    <span className={`${styles.badge} ${styles[incident.severity.toLowerCase()]}`}>{incident.severity}</span>
-                    <span>{Math.round(incident.risk * 100)}% risk</span>
-                    <span>{incident.status}</span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
+          </CardContent>
+        </Card>
+        <Card className={styles.incidentCard}>
+          <CardHeader><CardTitle>Incident queue</CardTitle><p className={styles.cardMeta}>Correlated situations / newest first</p></CardHeader>
+          <CardContent className={styles.queue}>
+            {loading && <p className={styles.message}>Loading operational data...</p>}
+            {!loading && !error && incidents.length === 0 && <p className={styles.message}>No incidents detected yet.</p>}
+            {incidents.map((incident) => <Link className={styles.incidentRow} href={`/incidents/${incident.id}`} key={incident.id}><div><strong>{formatLabel(incident.type)}</strong><span>{formatLabel(incident.location)} / {incident.status}</span></div><div className={styles.rowRight}><Badge className={severityClass(incident.severity)}>{incident.severity}</Badge><strong>{Math.round(incident.risk * 100)}%</strong></div></Link>)}
+          </CardContent>
+        </Card>
+      </section>
+      <section className={styles.signalSection}>
+        <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>Evidence intake</p><h2>Latest signals</h2></div><span>{events.length} retained</span></div><Separator />
+        <div className={styles.signalList}>{events.slice(0, 8).map((event) => <div className={styles.signalRow} key={event.id}><Badge variant="outline">{formatLabel(event.type)}</Badge><span>{formatLabel(event.location)}</span><span className={styles.signalSource}>{event.source}</span><time>{new Date(event.timestamp).toLocaleTimeString()}</time></div>)}{!loading && events.length === 0 && <p className={styles.message}>No signals have arrived yet.</p>}</div>
       </section>
     </main>
   );

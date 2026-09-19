@@ -67,6 +67,32 @@ Returns the incident's chronological timeline entries, oldest first. The optiona
 ]
 ```
 
+## `POST /incidents/{incident_id}/status`
+
+Records an operator-approved incident status transition and returns the updated incident. The request supports an optional note:
+
+```json
+{
+  "status": "ASSESSING",
+  "note": "Operator is reviewing evidence."
+}
+```
+
+Allowed transitions are `DETECTED -> ASSESSING`, `ASSESSING -> RESPONDING` or `RESOLVED`, and `RESPONDING -> RESOLVED`. Invalid transitions return `409`. Each accepted transition creates a `status.changed` timeline entry and broadcasts the updated incident.
+
+## `POST /incidents/{incident_id}/actions`
+
+Requests a human-approved action for an incident in `RESPONDING` status and forwards it to `N8N_WEBHOOK_URL`.
+
+```json
+{
+  "type": "notify_operator",
+  "note": "Send the approved response."
+}
+```
+
+The endpoint returns `503` when the webhook URL is not configured, `502` when delivery fails, and `409` when the incident is not `RESPONDING`. Successful delivery creates an `action.requested` timeline entry. This integration requests a workflow; it does not execute autonomous emergency action.
+
 ## `WS /ws/incidents`
 
 Streams incident updates from the current API process. The connection remains open until the client disconnects. When an event creates or updates an incident, subscribers receive:

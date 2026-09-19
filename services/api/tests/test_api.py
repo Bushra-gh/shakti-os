@@ -1,4 +1,5 @@
 import os
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -250,6 +251,95 @@ def test_missing_incident_timeline_returns_not_found(client: TestClient) -> None
     response = client.get("/incidents/missing/timeline")
 
     assert response.status_code == 404
+
+
+def test_operator_can_advance_incident_status_and_records_decision(client: TestClient) -> None:
+    client.post("/events", json=event_payload(timestamp="2026-09-19T12:00:00Z"))
+    incident = client.get("/incidents").json()[0]
+
+    response = client.post(
+        f"/incidents/{incident['id']}/status",
+        json={"status": "ASSESSING", "note": "Operator is reviewing evidence."},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ASSESSING"
+    timeline = client.get(f"/incidents/{incident['id']}/timeline").json()
+    status_entry = timeline[-1]
+    assert status_entry["type"] == "status.changed"
+    assert status_entry["details"] == {
+        "from_status": "DETECTED",
+        "to_status": "ASSESSING",
+        "note": "Operator is reviewing evidence.",
+    }
+
+
+def test_invalid_incident_status_transition_is_rejected(client: TestClient) -> None:
+    client.post("/events", json=event_payload())
+    incident = client.get("/incidents").json()[0]
+
+    response = client.post(
+        f"/incidents/{incident['id']}/status",
+        json={"status": "RESOLVED"},
+    )
+
+    assert response.status_code == 409
+
+
+def test_missing_incident_status_update_returns_not_found(client: TestClient) -> None:
+    response = client.post("/incidents/missing/status", json={"status": "ASSESSING"})
+
+    assert response.status_code == 404
+
+
+def prepare_responding_incident(client: TestClient) -> dict[str, object]:
+    client.post("/events", json=event_payload())
+    incident = client.get("/incidents").json()[0]
+    client.post(f"/incidents/{incident['id']}/status", json={"status": "ASSESSING"})
+    client.post(f"/incidents/{incident['id']}/status", json={"status": "RESPONDING"})
+    return incident
+
+
+def test_action_requires_responding_incident(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("N8N_WEBHOOK_URL", "http://n8n.test/webhook")
+    client.post("/events", json=event_payload())
+    incident = client.get("/incidents").json()[0]
+
+    response = client.post(f"/incidents/{incident['id']}/actions", json={"type": "notify_operator"})
+
+    assert response.status_code == 409
+
+
+def test_action_requires_webhook_configuration(client: TestClient) -> None:
+    incident = prepare_responding_incident(client)
+
+    response = client.post(f"/incidents/{incident['id']}/actions", json={"type": "notify_operator"})
+
+    assert response.status_code == 503
+
+
+def test_action_posts_to_n8n_and_records_timeline(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("N8N_WEBHOOK_URL", "http://n8n.test/webhook")
+    incident = prepare_responding_incident(client)
+    response_mock = MagicMock()
+    response_mock.raise_for_status.return_value = None
+    client_mock = AsyncMock()
+    client_mock.__aenter__.return_value.post.return_value = response_mock
+
+    with patch("shaktios_api.main.httpx.AsyncClient", return_value=client_mock):
+        response = client.post(
+            f"/incidents/{incident['id']}/actions",
+            json={"type": "notify_operator", "note": "Send the approved response."},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "accepted"
+    timeline = client.get(f"/incidents/{incident['id']}/timeline").json()
+    assert timeline[-1]["type"] == "action.requested"
+    assert timeline[-1]["details"]["action_type"] == "notify_operator"
 
 
 def test_get_missing_incident_returns_not_found(client: TestClient) -> None:

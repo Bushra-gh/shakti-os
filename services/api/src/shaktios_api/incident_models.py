@@ -20,6 +20,16 @@ class IncidentSeverity(StrEnum):
     CRITICAL = "CRITICAL"
 
 
+class IncidentStatusUpdate(BaseModel):
+    status: IncidentStatus
+    note: str | None = Field(default=None, max_length=500)
+
+
+class IncidentAction(BaseModel):
+    type: str = Field(min_length=1, max_length=100)
+    note: str | None = Field(default=None, max_length=500)
+
+
 class Incident(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -33,3 +43,9 @@ class Incident(BaseModel):
     factors: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+
+
+class ActionDelivery(BaseModel):
+    action_id: str
+    status: str
+    incident: Incident

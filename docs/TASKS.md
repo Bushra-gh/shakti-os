@@ -28,8 +28,9 @@
 - [x] Incident list
 - [x] Incident detail
 - [x] Realtime incident updates
-- [ ] Map
+- [x] Map
 - [x] Timeline
+- [x] Operator approval controls
 
 ## Intelligence
 
@@ -38,5 +39,5 @@
 
 ## Response
 
-- [ ] Operator approval
-- [ ] n8n webhook
+- [x] Operator approval
+- [x] n8n webhook

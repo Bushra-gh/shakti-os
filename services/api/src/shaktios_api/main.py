@@ -1,18 +1,22 @@
 import logging
+import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from uuid import uuid4
 
+import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from shaktios_api.database import create_tables, get_db
 from shaktios_api.event_store import EventRecord, list_events, save_event
-from shaktios_api.incident_models import Incident
-from shaktios_api.incident_store import correlate_event, get_incident, list_incidents
+from shaktios_api.incident_models import ActionDelivery, Incident, IncidentAction, IncidentStatus, IncidentStatusUpdate
+from shaktios_api.incident_store import IncidentRecord, correlate_event, get_incident, list_incidents
 from shaktios_api.models import Event
 from shaktios_api.realtime import event_connections, incident_connections
 from shaktios_api.timeline_models import TimelineEntry
-from shaktios_api.timeline_store import list_timeline_entries
+from shaktios_api.timeline_store import add_timeline_entry, list_timeline_entries
 
 logger = logging.getLogger(__name__)
 
@@ -106,3 +110,98 @@ def get_incident_timeline(
     if get_incident(db, incident_id) is None:
         raise HTTPException(status_code=404, detail="Incident not found")
     return list_timeline_entries(db, incident_id, limit)
+
+
+ALLOWED_STATUS_TRANSITIONS = {
+    IncidentStatus.DETECTED: {IncidentStatus.ASSESSING},
+    IncidentStatus.ASSESSING: {IncidentStatus.RESPONDING, IncidentStatus.RESOLVED},
+    IncidentStatus.RESPONDING: {IncidentStatus.RESOLVED},
+    IncidentStatus.RESOLVED: set(),
+}
+
+
+@app.post("/incidents/{incident_id}/status", response_model=Incident)
+async def update_incident_status(
+    incident_id: str,
+    update: IncidentStatusUpdate,
+    db: Session = Depends(get_db),
+) -> Incident:
+    record = db.get(IncidentRecord, incident_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    current_status = IncidentStatus(record.status)
+    if update.status not in ALLOWED_STATUS_TRANSITIONS[current_status]:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot transition incident from {current_status} to {update.status}",
+        )
+
+    record.status = update.status.value
+    record.updated_at = datetime.now(timezone.utc)
+    details: dict[str, object] = {
+        "from_status": current_status.value,
+        "to_status": update.status.value,
+    }
+    if update.note:
+        details["note"] = update.note
+    add_timeline_entry(
+        db,
+        incident_id,
+        "status.changed",
+        record.updated_at,
+        details,
+    )
+    db.commit()
+    db.refresh(record)
+    incident = get_incident(db, incident_id)
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    await incident_connections.broadcast(incident)
+    return incident
+
+
+@app.post("/incidents/{incident_id}/actions", response_model=ActionDelivery)
+async def request_incident_action(
+    incident_id: str,
+    action: IncidentAction,
+    db: Session = Depends(get_db),
+) -> ActionDelivery:
+    record = db.get(IncidentRecord, incident_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    if record.status != IncidentStatus.RESPONDING.value:
+        raise HTTPException(status_code=409, detail="Incident must be RESPONDING before requesting an action")
+
+    webhook_url = os.getenv("N8N_WEBHOOK_URL", "").strip()
+    if not webhook_url:
+        raise HTTPException(status_code=503, detail="N8N_WEBHOOK_URL is not configured")
+
+    action_id = str(uuid4())
+    incident = get_incident(db, incident_id)
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    payload = {
+        "action_id": action_id,
+        "action_type": action.type,
+        "note": action.note,
+        "incident": incident.model_dump(mode="json"),
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(webhook_url, json=payload)
+            response.raise_for_status()
+    except httpx.HTTPError as error:
+        logger.warning("action_webhook_failed", extra={"incident_id": incident_id, "error": str(error)})
+        raise HTTPException(status_code=502, detail="Action webhook delivery failed") from error
+
+    details: dict[str, object] = {
+        "action_id": action_id,
+        "action_type": action.type,
+        "delivery": "accepted",
+    }
+    if action.note:
+        details["note"] = action.note
+    add_timeline_entry(db, incident_id, "action.requested", datetime.now(timezone.utc), details)
+    db.commit()
+    return ActionDelivery(action_id=action_id, status="accepted", incident=incident)
