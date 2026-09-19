@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { type Event } from "@shaktios/types";
 import styles from "./page.module.css";
 
@@ -82,7 +83,7 @@ export default function Home() {
           {!loading && !error && incidents.length > 0 && (
             <div className={styles.incidentList}>
               {incidents.map((incident) => (
-                <article className={styles.incidentRow} key={incident.id}>
+                <Link className={styles.incidentRow} href={`/incidents/${incident.id}`} key={incident.id}>
                   <div>
                     <h3>{incident.type.replaceAll("_", " ")}</h3>
                     <p>{incident.location} / updated {new Date(incident.updated_at).toLocaleTimeString()}</p>
@@ -92,7 +93,7 @@ export default function Home() {
                     <span>{Math.round(incident.risk * 100)}% risk</span>
                     <span>{incident.status}</span>
                   </div>
-                </article>
+                </Link>
               ))}
             </div>
           )}

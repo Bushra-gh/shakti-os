@@ -26,7 +26,7 @@
 ## Dashboard
 
 - [x] Incident list
-- [ ] Incident detail
+- [x] Incident detail
 - [ ] Map
 - [ ] Timeline
 
