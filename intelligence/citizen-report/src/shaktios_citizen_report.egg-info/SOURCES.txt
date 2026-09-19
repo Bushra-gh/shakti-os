@@ -1,0 +1,10 @@
+README.md
+pyproject.toml
+src/citizen_report/__init__.py
+src/citizen_report/adapter.py
+src/shaktios_citizen_report.egg-info/PKG-INFO
+src/shaktios_citizen_report.egg-info/SOURCES.txt
+src/shaktios_citizen_report.egg-info/dependency_links.txt
+src/shaktios_citizen_report.egg-info/requires.txt
+src/shaktios_citizen_report.egg-info/top_level.txt
+tests/test_adapter.py

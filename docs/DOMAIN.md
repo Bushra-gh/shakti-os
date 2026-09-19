@@ -10,6 +10,8 @@
 - **Operator:** A person using the command dashboard.
 - **Citizen:** A person submitting a public report.
 
+Citizen reports are normalized by the Citizen Report Adapter into `citizen_report` Events. Reporter identity is not forwarded into the ShaktiOS event payload by default.
+
 Event → may contribute to Incident
 
 Incident → has many Events
