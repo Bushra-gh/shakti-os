@@ -4,7 +4,7 @@ Minimal Next.js shell for the ShaktiOS operator experience. The home screen incl
 
 Set `NEXT_PUBLIC_API_URL` when the API is not running at `http://localhost:8000`.
 
-The dashboard uses `GET /health`, `GET /events`, `GET /incidents`, `GET /incidents/{incident_id}`, `GET /incidents/{incident_id}/timeline`, `POST /incidents/{incident_id}/status`, `POST /incidents/{incident_id}/actions`, `WS /ws/events`, and `WS /ws/incidents`. Event submission remains a simulator/source responsibility and is intentionally not exposed as a dashboard control.
+The dashboard uses `GET /health`, `GET /events`, `POST /events`, `GET /incidents`, `GET /incidents/{incident_id}`, `GET /incidents/{incident_id}/timeline`, `POST /incidents/{incident_id}/status`, `POST /incidents/{incident_id}/actions`, `WS /ws/events`, and `WS /ws/incidents`. Civic-Shield and citizen-report adapters remain source-side packages; their normalized events enter through `POST /events`.
 
 From the repository root:
 

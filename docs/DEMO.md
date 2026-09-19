@@ -1,6 +1,6 @@
 # Demo
 
-Placeholder for the future end-to-end demo flow:
+End-to-end local demo flow:
 
 1. Start PostgreSQL.
 2. Start the API.

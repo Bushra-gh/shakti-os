@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { apiUrl, getEvents, getIncidents, websocketUrl, type Event, type Incident } from "@/lib/api";
 import styles from "./page.module.css";
@@ -29,6 +31,11 @@ export default function Home() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [connectionState, setConnectionState] = useState("CONNECTING");
+  const [eventType, setEventType] = useState("crowd_density");
+  const [eventLocation, setEventLocation] = useState("gate_4");
+  const [sendingEvent, setSendingEvent] = useState(false);
+  const [eventSent, setEventSent] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -47,6 +54,9 @@ export default function Home() {
       .finally(() => setLoading(false));
 
     const incidentSocket = new WebSocket(websocketUrl("/ws/incidents"));
+    incidentSocket.onopen = () => setConnectionState("LIVE");
+    incidentSocket.onclose = () => setConnectionState("DISCONNECTED");
+    incidentSocket.onerror = () => setConnectionState("DISCONNECTED");
     incidentSocket.onmessage = (message) => {
       const update = JSON.parse(message.data) as { type: string; incident: Incident };
       if (update.type !== "incident.updated") return;
@@ -70,6 +80,33 @@ export default function Home() {
     };
   }, []);
 
+  const submitEvent = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSendingEvent(true);
+    setEventSent(false);
+    try {
+      const response = await fetch(`${apiUrl}/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: eventType,
+          source: "dashboard_demo",
+          location: eventLocation,
+          confidence: 0.9,
+          payload: eventType === "crowd_density" ? { density: 0.72 } : { score: 0.72, velocity: 0.72 },
+        }),
+      });
+      if (!response.ok) throw new Error("Event submission failed");
+      const created = await response.json() as Event;
+      setEvents((current) => [created, ...current].slice(0, 50));
+      setEventSent(true);
+    } catch {
+      setError(true);
+    } finally {
+      setSendingEvent(false);
+    }
+  };
+
   const activeIncidents = incidents.filter((incident) => incident.status !== "RESOLVED");
   const criticalCount = activeIncidents.filter((incident) => ["HIGH", "CRITICAL"].includes(incident.severity)).length;
   const mapIncidents = useMemo(() => activeIncidents.slice(0, 8), [activeIncidents]);
@@ -78,13 +115,26 @@ export default function Home() {
     <main className={styles.page}>
       <header className={styles.topbar}>
         <div><p className={styles.eyebrow}>Operational command center / 02</p><h1>SHAKTIOS</h1></div>
-        <div className={styles.connection}><span className={styles.liveDot} /> LIVE / {apiUrl.replace(/^https?:\/\//, "")}</div>
+        <div className={styles.connection}><span className={`${styles.liveDot} ${connectionState === "DISCONNECTED" ? styles.offlineDot : ""}`} /> {connectionState} / {apiUrl.replace(/^https?:\/\//, "")}</div>
       </header>
       <div className={styles.rule} />
       <section className={styles.metrics}>
         <Card><CardHeader><CardTitle>Active incidents</CardTitle></CardHeader><CardContent className={styles.metric}>{activeIncidents.length.toString().padStart(2, "0")}</CardContent></Card>
         <Card><CardHeader><CardTitle>Elevated risk</CardTitle></CardHeader><CardContent className={`${styles.metric} ${criticalCount ? styles.alertMetric : ""}`}>{criticalCount.toString().padStart(2, "0")}</CardContent></Card>
         <Card><CardHeader><CardTitle>Signals / latest 50</CardTitle></CardHeader><CardContent className={styles.metric}>{events.length.toString().padStart(2, "0")}</CardContent></Card>
+      </section>
+      <section className={styles.intakeSection}>
+        <Card>
+          <CardHeader><CardTitle>Signal intake</CardTitle><p className={styles.cardMeta}>Manual demo event / POST /events</p></CardHeader>
+          <CardContent>
+            <form className={styles.intakeForm} onSubmit={submitEvent}>
+              <label>Signal type<select value={eventType} onChange={(event) => setEventType(event.target.value)}><option value="crowd_density">Crowd density</option><option value="abnormal_movement">Abnormal movement</option><option value="social_concern">Social concern</option><option value="citizen_report">Citizen report</option></select></label>
+              <label>Location<Input value={eventLocation} onChange={(event) => setEventLocation(event.target.value)} /></label>
+              <Button disabled={sendingEvent || !eventLocation.trim()}>{sendingEvent ? "Sending..." : "Submit signal"}</Button>
+            </form>
+            {eventSent && <p className={styles.successMessage}>Signal accepted. Incident correlation and realtime updates should follow.</p>}
+          </CardContent>
+        </Card>
       </section>
       {error && <p className={styles.error}>API unavailable. Start the ShaktiOS API to connect the command center.</p>}
       <section className={styles.workspace}>

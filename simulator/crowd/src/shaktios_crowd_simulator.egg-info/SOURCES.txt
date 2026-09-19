@@ -1,0 +1,11 @@
+README.md
+pyproject.toml
+src/shaktios_crowd_simulator/__init__.py
+src/shaktios_crowd_simulator/main.py
+src/shaktios_crowd_simulator.egg-info/PKG-INFO
+src/shaktios_crowd_simulator.egg-info/SOURCES.txt
+src/shaktios_crowd_simulator.egg-info/dependency_links.txt
+src/shaktios_crowd_simulator.egg-info/entry_points.txt
+src/shaktios_crowd_simulator.egg-info/requires.txt
+src/shaktios_crowd_simulator.egg-info/top_level.txt
+tests/test_main.py

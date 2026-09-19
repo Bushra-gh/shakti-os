@@ -80,7 +80,7 @@ python -m pip install -e .
 python -m shaktios_crowd_simulator.main
 ```
 
-The simulator prints one event and does not send it to the API.
+The simulator sends one deterministic event to the API. Add `--dry-run` to print without sending, or set `SHAKTIOS_API_URL` to use another API base URL.
 
 ## Development commands
 
