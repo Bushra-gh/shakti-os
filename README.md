@@ -6,7 +6,7 @@ ShaktiOS is an event-driven intelligence and response platform. Its planned flow
 Signals -> Events -> Signal Fusion -> Risk Assessment -> Incident -> Human-approved Action -> Audit / Timeline
 ```
 
-This repository is the bootstrap phase. It contains the architecture, development conventions, a minimal Next.js dashboard shell, a FastAPI health and event-ingestion API, shared frontend types, and a local crowd-event simulator. Product intelligence, risk, incidents, actions, WebSockets, authentication, and integrations are intentionally not implemented yet.
+This repository is the bootstrap phase. It contains the architecture, development conventions, a minimal Next.js dashboard shell, a FastAPI Event, Incident, and explainable Risk foundation, shared frontend types, and a local crowd-event simulator. Product intelligence adapters, actions, WebSockets, authentication, and integrations are intentionally incremental.
 
 ## Repository structure
 

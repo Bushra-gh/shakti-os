@@ -15,13 +15,20 @@ def bounded(value: float) -> float:
     return max(0.0, min(value, 1.0))
 
 
+def numeric(value: object, fallback: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
 def event_factor(event: Event, factor: str) -> float:
     if factor == "crowd_density" and event.type == "crowd_density":
-        return bounded(float(event.payload.get("density", 0.0)))
+        return bounded(numeric(event.payload.get("density")))
     if factor == "social_velocity" and event.type == "social_concern":
-        return bounded(float(event.payload.get("velocity", event.confidence)))
+        return bounded(numeric(event.payload.get("velocity", event.confidence)))
     if factor == "abnormal_movement" and event.type == "abnormal_movement":
-        return bounded(float(event.payload.get("score", event.confidence)))
+        return bounded(numeric(event.payload.get("score", event.confidence)))
     if factor == "citizen_reports" and event.type == "citizen_report":
         return 1.0
     return 0.0
@@ -29,7 +36,7 @@ def event_factor(event: Event, factor: str) -> float:
 
 def calculate_risk(existing: dict[str, Any], event: Event) -> tuple[float, IncidentSeverity, dict[str, Any]]:
     factors = {
-        factor: bounded(float(existing.get(factor, 0.0)))
+        factor: bounded(numeric(existing.get(factor, 0.0)))
         for factor in WEIGHTS
     }
     factors["citizen_report_count"] = int(existing.get("citizen_report_count", 0))
@@ -42,7 +49,10 @@ def calculate_risk(existing: dict[str, Any], event: Event) -> tuple[float, Incid
         else:
             factors[factor] = max(factors[factor], contribution)
 
-    risk = bounded(sum(WEIGHTS[factor] * factors[factor] for factor in WEIGHTS))
+    risk = round(
+        bounded(sum(WEIGHTS[factor] * factors[factor] for factor in WEIGHTS)),
+        4,
+    )
     if risk >= 0.85:
         severity = IncidentSeverity.CRITICAL
     elif risk >= 0.70:

@@ -71,6 +71,8 @@ The API also creates the `incidents` table:
 | `status` | `VARCHAR(32)` | Required |
 | `severity` | `VARCHAR(32)` | Required |
 | `confidence` | `FLOAT` | Required, validated from `0.0` to `1.0` |
+| `risk` | `FLOAT` | Required, normalized from `0.0` to `1.0` |
+| `factors` | `JSON` | Required, explainable contributions |
 | `created_at` | `TIMESTAMP WITH TIME ZONE` | Required |
 | `updated_at` | `TIMESTAMP WITH TIME ZONE` | Required |
 

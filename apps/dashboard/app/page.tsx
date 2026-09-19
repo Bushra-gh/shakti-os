@@ -1,5 +1,19 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { type Event } from "@shaktios/types";
 import styles from "./page.module.css";
+
+type Incident = {
+  id: string;
+  type: string;
+  location: string;
+  status: string;
+  severity: string;
+  confidence: number;
+  risk: number;
+  updated_at: string;
+};
 
 const previewEvent: Event = {
   id: "evt_preview_001",
@@ -12,6 +26,23 @@ const previewEvent: Event = {
 };
 
 export default function Home() {
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+    fetch(`${apiUrl}/incidents?limit=20`)
+      .then((response) => {
+        if (!response.ok) throw new Error("Incident request failed");
+        return response.json() as Promise<Incident[]>;
+      })
+      .then(setIncidents)
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <main className={styles.page}>
       <section className={styles.hero}>
@@ -35,6 +66,37 @@ export default function Home() {
             <pre>{JSON.stringify(previewEvent, null, 2)}</pre>
           </div>
         </div>
+        <section className={styles.incidentSection}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <div className={styles.kicker}>Situation awareness</div>
+              <h2>Active incidents</h2>
+            </div>
+            <span className={styles.count}>{incidents.length.toString().padStart(2, "0")}</span>
+          </div>
+          {loading && <p className={styles.message}>Loading incidents...</p>}
+          {error && <p className={styles.message}>API unavailable. Start the ShaktiOS API to view incidents.</p>}
+          {!loading && !error && incidents.length === 0 && (
+            <p className={styles.message}>No incidents have been detected yet.</p>
+          )}
+          {!loading && !error && incidents.length > 0 && (
+            <div className={styles.incidentList}>
+              {incidents.map((incident) => (
+                <article className={styles.incidentRow} key={incident.id}>
+                  <div>
+                    <h3>{incident.type.replaceAll("_", " ")}</h3>
+                    <p>{incident.location} / updated {new Date(incident.updated_at).toLocaleTimeString()}</p>
+                  </div>
+                  <div className={styles.incidentMeta}>
+                    <span className={`${styles.badge} ${styles[incident.severity.toLowerCase()]}`}>{incident.severity}</span>
+                    <span>{Math.round(incident.risk * 100)}% risk</span>
+                    <span>{incident.status}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
       </section>
     </main>
   );
