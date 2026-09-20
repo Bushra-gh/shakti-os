@@ -36,6 +36,17 @@ pnpm install
 Copy-Item .env.example .env
 ```
 
+The local `.env` uses these defaults:
+
+```text
+DATABASE_URL=postgresql://shaktios:shaktios_dev@localhost:5432/shaktios
+NEXT_PUBLIC_API_URL=http://localhost:8000
+SHAKTIOS_API_URL=http://localhost:8000
+N8N_WEBHOOK_URL=
+```
+
+`N8N_WEBHOOK_URL` is optional until the n8n workflow is hosted and activated.
+
 Start local PostgreSQL when needed:
 
 ```powershell

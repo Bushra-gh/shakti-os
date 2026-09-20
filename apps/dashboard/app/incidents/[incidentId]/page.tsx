@@ -8,189 +8,377 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { apiUrl, getTimeline, websocketUrl, type Incident, type TimelineEntry } from "@/lib/api";
+import {
+    apiUrl,
+    getTimeline,
+    requestIncidentAction,
+    updateIncidentStatus,
+    websocketUrl,
+    type Incident,
+    type TimelineEntry,
+} from "@/lib/api";
 import { subscribeWithReconnect, type ConnectionState } from "@/lib/realtime";
-import styles from "./page.module.css";
 
-export default function IncidentDetail({ params }: { params: Promise<{ incidentId: string }> }) {
-  const [incident, setIncident] = useState<Incident | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
-  const [timelineError, setTimelineError] = useState(false);
-  const [incidentId, setIncidentId] = useState<string>();
-  const [operatorNote, setOperatorNote] = useState("");
-  const [statusError, setStatusError] = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [actionType, setActionType] = useState("notify_operator");
-  const [actionState, setActionState] = useState<"idle" | "sending" | "accepted" | "error">("idle");
-  const [connectionState, setConnectionState] = useState<ConnectionState>("CONNECTING");
+const label = (value: string) => value.replaceAll("_", " ");
 
-  useEffect(() => {
-    let stopStream: (() => void) | undefined;
-    params.then(({ incidentId }) => {
-      setIncidentId(incidentId);
-      stopStream = subscribeWithReconnect(websocketUrl("/ws/incidents"), (data) => {
-        const update = JSON.parse(data) as { type: string; incident: Incident };
-        if (update.type === "incident.updated" && update.incident.id === incidentId) {
-          setIncident(update.incident);
-        }
-      }, setConnectionState);
+export default function IncidentDetail({
+    params,
+}: {
+    params: Promise<{ incidentId: string }>;
+}) {
+    const [incident, setIncident] = useState<Incident | null>(null);
+    const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+    const [incidentId, setIncidentId] = useState<string>();
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+    const [timelineError, setTimelineError] = useState(false);
+    const [statusError, setStatusError] = useState(false);
+    const [actionState, setActionState] = useState("idle");
+    const [note, setNote] = useState("");
+    const [actionType, setActionType] = useState("notify_operator");
+    const [connection, setConnection] = useState<ConnectionState>("CONNECTING");
 
-      fetch(`${apiUrl}/incidents/${incidentId}`)
-        .then((response) => {
-          if (!response.ok) throw new Error("Incident request failed");
-          return response.json() as Promise<Incident>;
-        })
-        .then(setIncident)
-        .catch(() => setError(true))
-        .finally(() => setLoading(false));
-
-      getTimeline(incidentId)
-        .then(setTimeline)
-        .catch(() => setTimelineError(true));
-
-    });
-
-    return () => stopStream?.();
+    useEffect(() => {
+        let stop: (() => void) | undefined;
+        params.then(({ incidentId: id }) => {
+            setIncidentId(id);
+            stop = subscribeWithReconnect(
+                websocketUrl("/ws/incidents"),
+                (data) => {
+                    const update = JSON.parse(data) as {
+                        type: string;
+                        incident: Incident;
+                    };
+                    if (
+                        update.type === "incident.updated" &&
+                        update.incident.id === id
+                    )
+                        setIncident(update.incident);
+                },
+                setConnection,
+            );
+            fetch(`${apiUrl}/incidents/${id}`)
+                .then((response) => {
+                    if (!response.ok) throw new Error();
+                    return response.json() as Promise<Incident>;
+                })
+                .then(setIncident)
+                .catch(() => setError(true))
+                .finally(() => setLoading(false));
+            getTimeline(id)
+                .then(setTimeline)
+                .catch(() => setTimelineError(true));
+        });
+        return () => stop?.();
     }, [params]);
 
-  const approveStatus = async (status: string) => {
-    if (!incidentId) return;
-    setUpdatingStatus(true);
-    setStatusError(false);
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-      const response = await fetch(`${apiUrl}/incidents/${incidentId}/status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, note: operatorNote || undefined }),
-      });
-      if (!response.ok) throw new Error("Status update failed");
-      setIncident(await response.json() as Incident);
-      setOperatorNote("");
-      const timelineResponse = await fetch(`${apiUrl}/incidents/${incidentId}/timeline?limit=100`);
-      if (timelineResponse.ok) setTimeline(await timelineResponse.json() as TimelineEntry[]);
-    } catch {
-      setStatusError(true);
-    } finally {
-      setUpdatingStatus(false);
-    }
-  };
+    const changeStatus = async (status: string) => {
+        if (!incidentId) return;
+        setStatusError(false);
+        try {
+            setIncident(
+                await updateIncidentStatus(
+                    incidentId,
+                    status,
+                    note || undefined,
+                ),
+            );
+            setNote("");
+            setTimeline(await getTimeline(incidentId));
+        } catch {
+            setStatusError(true);
+        }
+    };
+    const requestAction = async () => {
+        if (!incidentId) return;
+        setActionState("sending");
+        try {
+            await requestIncidentAction(
+                incidentId,
+                actionType,
+                note || undefined,
+            );
+            setActionState("accepted");
+            setTimeline(await getTimeline(incidentId));
+        } catch {
+            setActionState("error");
+        }
+    };
 
-  const requestAction = async () => {
-    if (!incidentId) return;
-    setActionState("sending");
-    try {
-      const response = await fetch(`${apiUrl}/incidents/${incidentId}/actions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: actionType }),
-      });
-      if (!response.ok) throw new Error("Action request failed");
-      setActionState("accepted");
-      setTimeline(await getTimeline(incidentId));
-    } catch {
-      setActionState("error");
-    }
-  };
-
-  return (
-    <main className={styles.page}>
-      <div className={styles.shell}>
-        <Link className={styles.backLink} href="/">← Back to incidents</Link>
-        {loading && <p className={styles.message}>Loading incident...</p>}
-        {error && <p className={styles.message}>Incident not found or API unavailable.</p>}
-        {incident && (
-          <>
-            <header className={styles.header}>
-              <div>
-                <p className={styles.eyebrow}>Incident assessment</p>
-                <h1>{incident.type.replaceAll("_", " ")}</h1>
-                <p className={styles.location}>{incident.location}</p>
-              </div>
-              <div className={styles.headerMeta}><Badge variant="outline">{incident.status}</Badge><span className={styles.streamState}>{connectionState}</span></div>
-            </header>
-            {incident.status !== "RESOLVED" && (
-              <Card className={styles.approvalCard}>
-                <CardHeader><CardTitle>Operator decision</CardTitle></CardHeader>
-                <CardContent>
-                  <p className={styles.approvalPrompt}>Review the evidence, then approve the next incident state.</p>
-                  <Textarea
-                    className={styles.noteInput}
-                    placeholder="Optional operator note"
-                    value={operatorNote}
-                    onChange={(event) => setOperatorNote(event.target.value)}
-                    maxLength={500}
-                  />
-                  <div className={styles.actionRow}>
-                    {incident.status === "DETECTED" && <Button disabled={updatingStatus} onClick={() => approveStatus("ASSESSING")}>Begin assessment</Button>}
-                    {incident.status === "ASSESSING" && <>
-                      <Button disabled={updatingStatus} onClick={() => approveStatus("RESPONDING")}>Approve response</Button>
-                      <Button variant="outline" disabled={updatingStatus} onClick={() => approveStatus("RESOLVED")}>Resolve incident</Button>
-                    </>}
-                    {incident.status === "RESPONDING" && <Button disabled={updatingStatus} onClick={() => approveStatus("RESOLVED")}>Resolve incident</Button>}
-                  </div>
-                  {statusError && <p className={styles.actionError}>Status update failed. Review the API connection and try again.</p>}
-                </CardContent>
-              </Card>
-            )}
-            {incident.status === "RESPONDING" && (
-              <Card className={styles.actionCard}>
-                <CardHeader><CardTitle>Approved response handoff</CardTitle></CardHeader>
-                <CardContent>
-                  <p className={styles.approvalPrompt}>Send a human-approved request to the configured n8n workflow.</p>
-                  <Input className={styles.actionInput} value={actionType} onChange={(event) => setActionType(event.target.value)} aria-label="Action type" />
-                  <Button className={styles.actionButton} disabled={actionState === "sending" || !actionType.trim()} onClick={requestAction}>{actionState === "sending" ? "Sending..." : "Request workflow"}</Button>
-                  {actionState === "accepted" && <p className={styles.successMessage}>Workflow request accepted and added to the timeline.</p>}
-                  {actionState === "error" && <p className={styles.actionError}>Workflow request failed. Check the n8n configuration and try again.</p>}
-                </CardContent>
-              </Card>
-            )}
-            <div className={styles.summaryGrid}>
-              <Card><CardHeader><CardTitle>Risk</CardTitle></CardHeader><CardContent className={styles.metric}>{Math.round(incident.risk * 100)}%</CardContent></Card>
-              <Card><CardHeader><CardTitle>Severity</CardTitle></CardHeader><CardContent className={styles.metric}>{incident.severity}</CardContent></Card>
-              <Card><CardHeader><CardTitle>Confidence</CardTitle></CardHeader><CardContent className={styles.metric}>{Math.round(incident.confidence * 100)}%</CardContent></Card>
-            </div>
-            <Card className={styles.evidenceCard}>
-              <CardHeader><CardTitle>Explainable risk factors</CardTitle></CardHeader>
-              <CardContent>
-                <div className={styles.factorList}>
-                  {Object.entries(incident.factors).map(([factor, value]) => (
-                    <div className={styles.factor} key={factor}><span>{factor.replaceAll("_", " ")}</span><strong>{typeof value === "number" ? value.toFixed(2) : value}</strong></div>
-                  ))}
-                </div>
-                <Separator className={styles.separator} />
-                <p className={styles.timestamps}>Detected {new Date(incident.created_at).toLocaleString()}<br />Last updated {new Date(incident.updated_at).toLocaleString()}</p>
-              </CardContent>
-            </Card>
-            <Card className={styles.timelineCard}>
-              <CardHeader><CardTitle>Incident timeline</CardTitle></CardHeader>
-              <CardContent>
-                {timelineError && <p className={styles.message}>Timeline unavailable.</p>}
-                {!timelineError && timeline.length === 0 && <p className={styles.message}>No correlated events recorded yet.</p>}
-                {!timelineError && timeline.length > 0 && (
-                  <div className={styles.timelineList}>
-                    {timeline.map((entry) => (
-                      <div className={styles.timelineEntry} key={entry.id}>
-                        <div className={styles.timelineMarker} />
-                        <div>
-                          <p className={styles.timelineType}>{entry.type.replaceAll(".", " / ")}</p>
-                          <p className={styles.timelineTime}>{new Date(entry.timestamp).toLocaleString()}</p>
-                          <p className={styles.timelineDetails}>
-                            {String(entry.details.event_type ?? "event").replaceAll("_", " ")} from {String(entry.details.source ?? "unknown source")}
-                            {entry.details.risk !== undefined && ` / risk ${Math.round(Number(entry.details.risk) * 100)}%`}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+    return (
+        <main className="min-h-screen bg-[var(--background)] px-5 py-8 text-[var(--foreground)] sm:px-12">
+            <div className="mx-auto max-w-5xl">
+                <Link
+                    className="font-mono text-xs uppercase tracking-[.06em] text-[var(--accent-dark)]"
+                    href="/"
+                >
+                    ← Back to incidents
+                </Link>
+                {loading && (
+                    <p className="mt-14 text-[var(--muted)]">
+                        Loading incident...
+                    </p>
                 )}
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
-    </main>
-  );
+                {error && (
+                    <p className="mt-14 text-[var(--accent-dark)]">
+                        Incident not found or API unavailable.
+                    </p>
+                )}
+                {incident && (
+                    <>
+                        <header className="mb-8 mt-14 flex items-start justify-between gap-6">
+                            <div>
+                                <p className="font-mono text-xs uppercase tracking-[.06em] text-[var(--accent-dark)]">
+                                    Incident assessment
+                                </p>
+                                <h1 className="mt-3 text-5xl font-bold capitalize tracking-[-.05em] sm:text-7xl">
+                                    {label(incident.type)}
+                                </h1>
+                                <p className="mt-2 font-mono text-sm uppercase text-[var(--muted)]">
+                                    {incident.location}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <Badge variant="outline">
+                                    {incident.status}
+                                </Badge>
+                                <span className="font-mono text-[.65rem] uppercase text-[var(--muted)]">
+                                    {connection}
+                                </span>
+                            </div>
+                        </header>
+                        {incident.status !== "RESOLVED" && (
+                            <Card className="mb-4 border-[var(--accent)]">
+                                <CardHeader>
+                                    <CardTitle>Operator decision</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-sm text-[var(--muted)]">
+                                        Review the evidence, then approve the
+                                        next incident state.
+                                    </p>
+                                    <Textarea
+                                        className="mt-4 min-h-20"
+                                        placeholder="Optional operator note"
+                                        value={note}
+                                        onChange={(event) =>
+                                            setNote(event.target.value)
+                                        }
+                                        maxLength={500}
+                                    />
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {incident.status === "DETECTED" && (
+                                            <Button
+                                                onClick={() =>
+                                                    changeStatus("ASSESSING")
+                                                }
+                                            >
+                                                Begin assessment
+                                            </Button>
+                                        )}
+                                        {incident.status === "ASSESSING" && (
+                                            <>
+                                                <Button
+                                                    onClick={() =>
+                                                        changeStatus(
+                                                            "RESPONDING",
+                                                        )
+                                                    }
+                                                >
+                                                    Approve response
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        changeStatus("RESOLVED")
+                                                    }
+                                                >
+                                                    Resolve incident
+                                                </Button>
+                                            </>
+                                        )}
+                                        {incident.status === "RESPONDING" && (
+                                            <Button
+                                                onClick={() =>
+                                                    changeStatus("RESOLVED")
+                                                }
+                                            >
+                                                Resolve incident
+                                            </Button>
+                                        )}
+                                    </div>
+                                    {statusError && (
+                                        <p className="mt-3 text-xs text-[var(--accent-dark)]">
+                                            Status update failed. Try again.
+                                        </p>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+                        {incident.status === "RESPONDING" && (
+                            <Card className="mb-4 border-[var(--accent-dark)]">
+                                <CardHeader>
+                                    <CardTitle>
+                                        Approved response handoff
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-sm text-[var(--muted)]">
+                                        Send a human-approved request to the
+                                        configured n8n workflow.
+                                    </p>
+                                    <Input
+                                        className="mt-4 max-w-xs"
+                                        value={actionType}
+                                        onChange={(event) =>
+                                            setActionType(event.target.value)
+                                        }
+                                    />
+                                    <Button
+                                        className="mt-3"
+                                        disabled={actionState === "sending"}
+                                        onClick={requestAction}
+                                    >
+                                        {actionState === "sending"
+                                            ? "Sending..."
+                                            : "Request workflow"}
+                                    </Button>
+                                    {actionState === "accepted" && (
+                                        <p className="mt-3 text-xs text-[#3f8d59]">
+                                            Workflow request accepted and added
+                                            to the timeline.
+                                        </p>
+                                    )}
+                                    {actionState === "error" && (
+                                        <p className="mt-3 text-xs text-[var(--accent-dark)]">
+                                            Workflow request failed. Check n8n
+                                            configuration.
+                                        </p>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+                        <section className="grid gap-4 sm:grid-cols-3">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Risk</CardTitle>
+                                </CardHeader>
+                                <CardContent className="text-3xl font-bold">
+                                    {Math.round(incident.risk * 100)}%
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Severity</CardTitle>
+                                </CardHeader>
+                                <CardContent className="text-3xl font-bold uppercase">
+                                    {incident.severity}
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Confidence</CardTitle>
+                                </CardHeader>
+                                <CardContent className="text-3xl font-bold">
+                                    {Math.round(incident.confidence * 100)}%
+                                </CardContent>
+                            </Card>
+                        </section>
+                        <Card className="mt-4">
+                            <CardHeader>
+                                <CardTitle>Explainable risk factors</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid gap-3">
+                                    {Object.entries(incident.factors).map(
+                                        ([factor, value]) => (
+                                            <div
+                                                className="flex justify-between gap-5 capitalize"
+                                                key={factor}
+                                            >
+                                                <span>{label(factor)}</span>
+                                                <strong>
+                                                    {typeof value === "number"
+                                                        ? value.toFixed(2)
+                                                        : value}
+                                                </strong>
+                                            </div>
+                                        ),
+                                    )}
+                                </div>
+                                <Separator className="my-6" />
+                                <p className="font-mono text-xs uppercase leading-7 text-[var(--muted)]">
+                                    Detected{" "}
+                                    {new Date(
+                                        incident.created_at,
+                                    ).toLocaleString()}
+                                    <br />
+                                    Last updated{" "}
+                                    {new Date(
+                                        incident.updated_at,
+                                    ).toLocaleString()}
+                                </p>
+                            </CardContent>
+                        </Card>
+                        <Card className="mt-4">
+                            <CardHeader>
+                                <CardTitle>Incident timeline</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {timelineError && (
+                                    <p className="text-sm text-[var(--accent-dark)]">
+                                        Timeline unavailable.
+                                    </p>
+                                )}
+                                {!timelineError && !timeline.length && (
+                                    <p className="text-sm text-[var(--muted)]">
+                                        No timeline entries recorded yet.
+                                    </p>
+                                )}
+                                <div className="grid gap-6">
+                                    {timeline.map((entry) => (
+                                        <div
+                                            className="grid grid-cols-[12px_1fr] gap-3"
+                                            key={entry.id}
+                                        >
+                                            <span className="mt-1 size-2 rounded-full bg-[var(--accent-dark)]" />
+                                            <div>
+                                                <p className="font-mono text-xs font-bold uppercase">
+                                                    {entry.type.replaceAll(
+                                                        ".",
+                                                        " / ",
+                                                    )}
+                                                </p>
+                                                <p className="mt-1 font-mono text-[.7rem] uppercase text-[var(--muted)]">
+                                                    {new Date(
+                                                        entry.timestamp,
+                                                    ).toLocaleString()}
+                                                </p>
+                                                <p className="mt-1 text-sm text-[var(--muted)]">
+                                                    {String(
+                                                        entry.details
+                                                            .event_type ??
+                                                            entry.details
+                                                                .action_type ??
+                                                            "event",
+                                                    )}{" "}
+                                                    from{" "}
+                                                    {String(
+                                                        entry.details.source ??
+                                                            entry.details
+                                                                .delivery ??
+                                                            "operator",
+                                                    )}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </>
+                )}
+            </div>
+        </main>
+    );
 }

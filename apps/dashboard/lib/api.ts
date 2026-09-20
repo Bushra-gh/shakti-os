@@ -52,3 +52,33 @@ export async function getTimeline(incidentId: string): Promise<TimelineEntry[]> 
   if (!response.ok) throw new Error("Timeline request failed");
   return response.json();
 }
+
+export async function submitEvent(event: Omit<Event, "id" | "timestamp">): Promise<Event> {
+  const response = await fetch(`${apiUrl}/events`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(event),
+  });
+  if (!response.ok) throw new Error("Event submission failed");
+  return response.json();
+}
+
+export async function updateIncidentStatus(incidentId: string, status: string, note?: string): Promise<Incident> {
+  const response = await fetch(`${apiUrl}/incidents/${incidentId}/status`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, note }),
+  });
+  if (!response.ok) throw new Error("Status update failed");
+  return response.json();
+}
+
+export async function requestIncidentAction(incidentId: string, type: string, note?: string): Promise<{ action_id: string; status: string; incident: Incident }> {
+  const response = await fetch(`${apiUrl}/incidents/${incidentId}/actions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type, note }),
+  });
+  if (!response.ok) throw new Error("Action request failed");
+  return response.json();
+}

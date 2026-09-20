@@ -91,7 +91,7 @@ Requests a human-approved action for an incident in `RESPONDING` status and forw
 }
 ```
 
-The endpoint returns `503` when the webhook URL is not configured, `502` when delivery fails, and `409` when the incident is not `RESPONDING`. Successful delivery creates an `action.requested` timeline entry. This integration requests a workflow; it does not execute autonomous emergency action.
+The endpoint returns `503` when the webhook URL is not configured, `502` when delivery fails, and `409` when the incident is not `RESPONDING`. The operator note is forwarded to n8n and successful delivery creates an `action.requested` timeline entry. This integration requests a workflow; it does not execute autonomous emergency action.
 
 ## `WS /ws/incidents`
 

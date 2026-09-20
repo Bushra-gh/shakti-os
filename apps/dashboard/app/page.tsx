@@ -7,161 +7,58 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { apiUrl, getEvents, getIncidents, websocketUrl, type Event, type Incident } from "@/lib/api";
+import { apiUrl, getEvents, getIncidents, submitEvent, websocketUrl, type Event, type Incident } from "@/lib/api";
 import { subscribeWithReconnect, type ConnectionState } from "@/lib/realtime";
-import styles from "./page.module.css";
 
-const gatePositions: Record<string, { left: string; top: string }> = {
-  gate_1: { left: "18%", top: "28%" },
-  gate_2: { left: "72%", top: "24%" },
-  gate_3: { left: "78%", top: "72%" },
-  gate_4: { left: "26%", top: "70%" },
-  gate_9: { left: "50%", top: "48%" },
-};
-
-function formatLabel(value: string): string {
-  return value.replaceAll("_", " ");
-}
-
-function severityClass(severity: string): string {
-  return styles[severity.toLowerCase()] ?? "";
-}
+const positions: Record<string, { left: string; top: string }> = { gate_1: { left: "18%", top: "28%" }, gate_2: { left: "72%", top: "24%" }, gate_3: { left: "78%", top: "72%" }, gate_4: { left: "26%", top: "70%" }, gate_9: { left: "50%", top: "48%" } };
+const label = (value: string) => value.replaceAll("_", " ");
+const severityClass = (value: string) => value === "HIGH" || value === "CRITICAL" ? "bg-[#a8442b] text-[#fff8ef]" : value === "MEDIUM" ? "bg-[#e7c17c]" : "bg-[#c9dfc9]";
 
 export default function Home() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [incidentConnection, setIncidentConnection] = useState<ConnectionState>("CONNECTING");
-  const [eventConnection, setEventConnection] = useState<ConnectionState>("CONNECTING");
+  const [incidentState, setIncidentState] = useState<ConnectionState>("CONNECTING");
+  const [eventState, setEventState] = useState<ConnectionState>("CONNECTING");
   const [eventType, setEventType] = useState("crowd_density");
-  const [eventLocation, setEventLocation] = useState("gate_4");
-  const [sendingEvent, setSendingEvent] = useState(false);
-  const [eventSent, setEventSent] = useState(false);
+  const [location, setLocation] = useState("gate_4");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      fetch(`${apiUrl}/health`).then((response) => {
-        if (!response.ok) throw new Error("Health request failed");
-        return response.json() as Promise<{ status: string }>;
-      }),
-      getIncidents(),
-      getEvents(),
-    ])
-      .then(([, nextIncidents, nextEvents]) => {
-        setIncidents(nextIncidents);
-        setEvents(nextEvents);
-      })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-
-    const stopIncidentStream = subscribeWithReconnect(websocketUrl("/ws/incidents"), (data) => {
+    Promise.all([fetch(`${apiUrl}/health`), getIncidents(), getEvents()]).then(async ([health, nextIncidents, nextEvents]) => {
+      if (!health.ok) throw new Error("Health check failed");
+      setIncidents(nextIncidents); setEvents(nextEvents);
+    }).catch(() => setError(true)).finally(() => setLoading(false));
+    const stopIncidents = subscribeWithReconnect(websocketUrl("/ws/incidents"), (data) => {
       const update = JSON.parse(data) as { type: string; incident: Incident };
-      if (update.type !== "incident.updated") return;
-      setIncidents((current) => {
-        const next = current.some((incident) => incident.id === update.incident.id)
-          ? current.map((incident) => incident.id === update.incident.id ? update.incident : incident)
-          : [update.incident, ...current];
-        return next.sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 50);
-      });
-    }, setIncidentConnection);
-
-    const stopEventStream = subscribeWithReconnect(websocketUrl("/ws/events"), (data) => {
+      if (update.type === "incident.updated") setIncidents((current) => [...current.filter((item) => item.id !== update.incident.id), update.incident].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 50));
+    }, setIncidentState);
+    const stopEvents = subscribeWithReconnect(websocketUrl("/ws/events"), (data) => {
       const update = JSON.parse(data) as { type: string; event: Event };
       if (update.type === "event.created") setEvents((current) => [update.event, ...current].slice(0, 50));
-    }, setEventConnection);
-
-    return () => {
-      stopIncidentStream();
-      stopEventStream();
-    };
+    }, setEventState);
+    return () => { stopIncidents(); stopEvents(); };
   }, []);
 
-  const submitEvent = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSendingEvent(true);
-    setEventSent(false);
-    try {
-      const response = await fetch(`${apiUrl}/events`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: eventType,
-          source: "dashboard_demo",
-          location: eventLocation,
-          confidence: 0.9,
-          payload: eventType === "crowd_density" ? { density: 0.72 } : { score: 0.72, velocity: 0.72 },
-        }),
-      });
-      if (!response.ok) throw new Error("Event submission failed");
-      const created = await response.json() as Event;
-      setEvents((current) => [created, ...current].slice(0, 50));
-      setEventSent(true);
-    } catch {
-      setError(true);
-    } finally {
-      setSendingEvent(false);
-    }
+  const submit = async (formEvent: React.FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault(); setSending(true); setSent(false);
+    try { const created = await submitEvent({ type: eventType, source: "dashboard_demo", location, confidence: 0.9, payload: eventType === "crowd_density" ? { density: 0.72 } : { score: 0.72, velocity: 0.72 } }); setEvents((current) => [created, ...current].slice(0, 50)); setSent(true); } catch { setError(true); } finally { setSending(false); }
   };
 
-  const activeIncidents = incidents.filter((incident) => incident.status !== "RESOLVED");
-  const criticalCount = activeIncidents.filter((incident) => ["HIGH", "CRITICAL"].includes(incident.severity)).length;
-  const mapIncidents = useMemo(() => activeIncidents.slice(0, 8), [activeIncidents]);
+  const active = incidents.filter((item) => item.status !== "RESOLVED");
+  const elevated = active.filter((item) => ["HIGH", "CRITICAL"].includes(item.severity)).length;
+  const plotted = useMemo(() => active.slice(0, 8), [active]);
+  const connected = incidentState === "LIVE" && eventState === "LIVE";
 
-  return (
-    <main className={styles.page}>
-      <header className={styles.topbar}>
-        <div><p className={styles.eyebrow}>Operational command center / 02</p><h1>SHAKTIOS</h1></div>
-        <div className={styles.connection}><span className={`${styles.liveDot} ${incidentConnection !== "LIVE" || eventConnection !== "LIVE" ? styles.offlineDot : ""}`} /> INCIDENTS {incidentConnection} / EVENTS {eventConnection}</div>
-      </header>
-      <div className={styles.rule} />
-      <section className={styles.metrics}>
-        <Card><CardHeader><CardTitle>Active incidents</CardTitle></CardHeader><CardContent className={styles.metric}>{activeIncidents.length.toString().padStart(2, "0")}</CardContent></Card>
-        <Card><CardHeader><CardTitle>Elevated risk</CardTitle></CardHeader><CardContent className={`${styles.metric} ${criticalCount ? styles.alertMetric : ""}`}>{criticalCount.toString().padStart(2, "0")}</CardContent></Card>
-        <Card><CardHeader><CardTitle>Signals / latest 50</CardTitle></CardHeader><CardContent className={styles.metric}>{events.length.toString().padStart(2, "0")}</CardContent></Card>
-      </section>
-      <section className={styles.intakeSection}>
-        <Card>
-          <CardHeader><CardTitle>Signal intake</CardTitle><p className={styles.cardMeta}>Manual demo event / POST /events</p></CardHeader>
-          <CardContent>
-            <form className={styles.intakeForm} onSubmit={submitEvent}>
-              <label>Signal type<select value={eventType} onChange={(event) => setEventType(event.target.value)}><option value="crowd_density">Crowd density</option><option value="abnormal_movement">Abnormal movement</option><option value="social_concern">Social concern</option><option value="citizen_report">Citizen report</option></select></label>
-              <label>Location<Input value={eventLocation} onChange={(event) => setEventLocation(event.target.value)} /></label>
-              <Button disabled={sendingEvent || !eventLocation.trim()}>{sendingEvent ? "Sending..." : "Submit signal"}</Button>
-            </form>
-            {eventSent && <p className={styles.successMessage}>Signal accepted. Incident correlation and realtime updates should follow.</p>}
-          </CardContent>
-        </Card>
-      </section>
-      {error && <p className={styles.error}>API unavailable. Start the ShaktiOS API to connect the command center.</p>}
-      <section className={styles.workspace}>
-        <Card className={styles.mapCard}>
-          <CardHeader><CardTitle>Location overview</CardTitle><p className={styles.cardMeta}>Live incident positions / named gates</p></CardHeader>
-          <CardContent>
-            <div className={styles.map}>
-              <div className={`${styles.mapRoad} ${styles.roadHorizontal}`} /><div className={`${styles.mapRoad} ${styles.roadVertical}`} />
-              <span className={styles.mapLabel}>NORTH PLAZA</span><span className={`${styles.mapLabel} ${styles.southLabel}`}>SOUTH ACCESS</span>
-              {mapIncidents.map((incident) => {
-                const position = gatePositions[incident.location] ?? { left: "50%", top: "50%" };
-                return <Link key={incident.id} href={`/incidents/${incident.id}`} className={`${styles.mapMarker} ${severityClass(incident.severity)}`} style={position} title={`${formatLabel(incident.location)} / ${incident.severity}`}><span />{formatLabel(incident.location)}</Link>;
-              })}
-              {mapIncidents.length === 0 && <p className={styles.mapEmpty}>No active incidents to plot.</p>}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className={styles.incidentCard}>
-          <CardHeader><CardTitle>Incident queue</CardTitle><p className={styles.cardMeta}>Correlated situations / newest first</p></CardHeader>
-          <CardContent className={styles.queue}>
-            {loading && <p className={styles.message}>Loading operational data...</p>}
-            {!loading && !error && incidents.length === 0 && <p className={styles.message}>No incidents detected yet.</p>}
-            {incidents.map((incident) => <Link className={styles.incidentRow} href={`/incidents/${incident.id}`} key={incident.id}><div><strong>{formatLabel(incident.type)}</strong><span>{formatLabel(incident.location)} / {incident.status}</span></div><div className={styles.rowRight}><Badge className={severityClass(incident.severity)}>{incident.severity}</Badge><strong>{Math.round(incident.risk * 100)}%</strong></div></Link>)}
-          </CardContent>
-        </Card>
-      </section>
-      <section className={styles.signalSection}>
-        <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>Evidence intake</p><h2>Latest signals</h2></div><span>{events.length} retained</span></div><Separator />
-        <div className={styles.signalList}>{events.slice(0, 8).map((event) => <div className={styles.signalRow} key={event.id}><Badge variant="outline">{formatLabel(event.type)}</Badge><span>{formatLabel(event.location)}</span><span className={styles.signalSource}>{event.source}</span><time>{new Date(event.timestamp).toLocaleTimeString()}</time></div>)}{!loading && events.length === 0 && <p className={styles.message}>No signals have arrived yet.</p>}</div>
-      </section>
-    </main>
-  );
+  return <main className="mx-auto min-h-screen max-w-[1440px] bg-[var(--background)] px-5 py-8 text-[var(--foreground)] sm:px-12 sm:py-10">
+    <header className="flex items-end justify-between gap-6"><div><p className="font-mono text-[.7rem] uppercase tracking-[.08em] text-[var(--accent-dark)]">Operational command center / 02</p><h1 className="mt-2 text-6xl font-extrabold leading-[.8] tracking-[-.06em] sm:text-8xl">SHAKTIOS</h1></div><div className="font-mono text-[.65rem] uppercase tracking-[.08em] text-[var(--muted)]"><span className={`mr-2 inline-block size-2 rounded-full ${connected ? "bg-[#3f8d59]" : "bg-[var(--accent-dark)]"}`} />INCIDENTS {incidentState} / EVENTS {eventState}</div></header>
+    <div className="my-8 h-px bg-[var(--line)]" />
+    <section className="grid gap-4 sm:grid-cols-3"><Card><CardHeader><CardTitle>Active incidents</CardTitle></CardHeader><CardContent className="text-4xl font-bold">{active.length.toString().padStart(2, "0")}</CardContent></Card><Card><CardHeader><CardTitle>Elevated risk</CardTitle></CardHeader><CardContent className={`text-4xl font-bold ${elevated ? "text-[var(--accent-dark)]" : ""}`}>{elevated.toString().padStart(2, "0")}</CardContent></Card><Card><CardHeader><CardTitle>Signals / latest 50</CardTitle></CardHeader><CardContent className="text-4xl font-bold">{events.length.toString().padStart(2, "0")}</CardContent></Card></section>
+    {error && <p className="my-5 font-mono text-xs uppercase tracking-[.08em] text-[var(--accent-dark)]">API unavailable. Start the ShaktiOS API to connect the command center.</p>}
+    <section className="mt-4 grid gap-4 lg:grid-cols-[1.15fr_.85fr]"><Card className="min-h-[510px]"><CardHeader><CardTitle>Location overview</CardTitle><p className="mt-1 font-mono text-[.62rem] uppercase tracking-[.08em] text-[var(--muted)]">Live incident positions / named gates</p></CardHeader><CardContent><div className="relative min-h-[400px] overflow-hidden border border-[var(--line)] bg-[#e7eadf] before:absolute before:inset-0 before:bg-[linear-gradient(45deg,#bcc5b7_25%,transparent_25%),linear-gradient(-45deg,#bcc5b7_25%,transparent_25%)] before:bg-[length:32px_32px] before:opacity-35"><div className="absolute left-[-5%] right-[-5%] top-[47%] z-[1] h-11 -rotate-2 bg-[#f7f4e9] shadow-[0_0_0_1px_#d5d8cb]" /><div className="absolute bottom-[-5%] left-[49%] top-[-5%] z-[1] w-10 rotate-[18deg] bg-[#f7f4e9] shadow-[0_0_0_1px_#d5d8cb]" /><span className="absolute left-3 top-3 z-[2] font-mono text-[.62rem] tracking-[.1em] text-[#778274]">NORTH PLAZA</span><span className="absolute bottom-3 right-3 z-[2] font-mono text-[.62rem] tracking-[.1em] text-[#778274]">SOUTH ACCESS</span>{plotted.map((item) => <Link key={item.id} href={`/incidents/${item.id}`} className="absolute z-[3] flex -translate-x-1 -translate-y-1 items-center gap-2 font-mono text-[.65rem] uppercase" style={positions[item.location] ?? { left: "50%", top: "50%" }}><span className={`size-3 rounded-full border-2 border-[var(--panel)] ${severityClass(item.severity)}`} />{label(item.location)}</Link>)}{!plotted.length && <p className="absolute inset-x-0 top-1/2 text-center font-mono text-xs text-[var(--muted)]">No active incidents to plot.</p>}</div></CardContent></Card><Card className="min-h-[510px]"><CardHeader><CardTitle>Incident queue</CardTitle><p className="mt-1 font-mono text-[.62rem] uppercase tracking-[.08em] text-[var(--muted)]">Correlated situations / newest first</p></CardHeader><CardContent className="pt-0">{loading && <p className="font-mono text-xs text-[var(--muted)]">Loading operational data...</p>}{!loading && !incidents.length && <p className="font-mono text-xs text-[var(--muted)]">No incidents detected yet.</p>}{incidents.map((item) => <Link className="flex items-center justify-between gap-4 border-b border-[var(--line)] py-4" href={`/incidents/${item.id}`} key={item.id}><div><strong className="block text-sm capitalize">{label(item.type)}</strong><span className="mt-1 block font-mono text-[.62rem] uppercase tracking-[.08em] text-[var(--muted)]">{label(item.location)} / {item.status}</span></div><div className="flex items-center gap-3"><Badge className={severityClass(item.severity)}>{item.severity}</Badge><strong className="font-mono text-xs">{Math.round(item.risk * 100)}%</strong></div></Link>)}</CardContent></Card></section>
+    <section className="mt-4"><Card><CardHeader><CardTitle>Signal intake</CardTitle><p className="mt-1 font-mono text-[.62rem] uppercase tracking-[.08em] text-[var(--muted)]">Manual demo event / POST /events</p></CardHeader><CardContent><form className="grid items-end gap-4 sm:grid-cols-[1fr_1fr_auto]" onSubmit={submit}><label className="font-mono text-[.68rem] uppercase text-[var(--muted)]">Signal type<select className="mt-2 block h-9 w-full border border-[var(--line)] bg-[var(--panel)] px-2 font-mono text-xs" value={eventType} onChange={(event) => setEventType(event.target.value)}><option value="crowd_density">Crowd density</option><option value="abnormal_movement">Abnormal movement</option><option value="social_concern">Social concern</option><option value="citizen_report">Citizen report</option></select></label><label className="font-mono text-[.68rem] uppercase text-[var(--muted)]">Location<Input value={location} onChange={(event) => setLocation(event.target.value)} /></label><Button disabled={sending || !location.trim()}>{sending ? "Sending..." : "Submit signal"}</Button></form>{sent && <p className="mt-3 text-xs text-[#3f8d59]">Signal accepted. Incident correlation and realtime updates should follow.</p>}</CardContent></Card></section>
+    <section className="mt-14"><div className="mb-4 flex items-end justify-between gap-6"><div><p className="font-mono text-[.7rem] uppercase tracking-[.08em] text-[var(--accent-dark)]">Evidence intake</p><h2 className="mt-2 text-4xl tracking-[-.05em]">Latest signals</h2></div><span className="font-mono text-xs text-[var(--muted)]">{events.length} retained</span></div><Separator /><div>{events.slice(0, 8).map((item) => <div className="grid items-center gap-4 border-b border-[var(--line)] py-3 font-mono text-xs uppercase sm:grid-cols-[150px_1fr_1fr_110px]" key={item.id}><Badge className="w-fit" variant="outline">{label(item.type)}</Badge><span>{label(item.location)}</span><span className="text-[var(--accent-dark)]">{item.source}</span><time className="sm:text-right">{new Date(item.timestamp).toLocaleTimeString()}</time></div>)}{!loading && !events.length && <p className="py-4 font-mono text-xs text-[var(--muted)]">No signals have arrived yet.</p>}</div></section>
+  </main>;
 }
