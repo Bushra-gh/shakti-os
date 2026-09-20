@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -33,13 +35,7 @@ import {
 } from "@/lib/api";
 import { subscribeWithReconnect, type ConnectionState } from "@/lib/realtime";
 
-const positions: Record<string, { left: string; top: string }> = {
-  gate_1: { left: "20%", top: "27%" },
-  gate_2: { left: "73%", top: "22%" },
-  gate_3: { left: "78%", top: "72%" },
-  gate_4: { left: "27%", top: "70%" },
-  gate_9: { left: "51%", top: "47%" },
-};
+const SituationMap = dynamic(() => import("@/components/situation-map"), { ssr: false });
 
 const label = (value: string) => value.replaceAll("_", " ");
 
@@ -166,19 +162,24 @@ export default function DashboardPage() {
                 <DialogTitle className="text-xl font-medium tracking-[-0.03em]">Submit a signal</DialogTitle>
               </DialogHeader>
               <form className="space-y-4 pt-2" onSubmit={submit}>
-                <label className="block text-[12px] font-medium text-[#6e6e73]">
-                  Signal type
-                  <select className="mt-2 block h-11 w-full rounded-2xl border border-[#d2d2d7] bg-[#f5f5f7] px-3 text-sm font-medium text-[#1d1d1f]" value={eventType} onChange={(event) => setEventType(event.target.value)}>
-                    <option value="crowd_density">Crowd density</option>
-                    <option value="abnormal_movement">Abnormal movement</option>
-                    <option value="social_concern">Social concern</option>
-                    <option value="citizen_report">Citizen report</option>
-                  </select>
-                </label>
-                <label className="block text-[12px] font-medium text-[#6e6e73]">
-                  Location
-                  <Input className="mt-2 h-11 rounded-2xl bg-[#f5f5f7] font-medium" value={location} onChange={(event) => setLocation(event.target.value)} />
-                </label>
+                <div className="space-y-2">
+                  <label className="text-[12px] font-medium text-[#6e6e73]">Signal type</label>
+                  <Select value={eventType} onValueChange={(v) => v && setEventType(v)}>
+                    <SelectTrigger className="h-11 w-full rounded-2xl bg-[#f5f5f7] font-medium">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="crowd_density">Crowd density</SelectItem>
+                      <SelectItem value="abnormal_movement">Abnormal movement</SelectItem>
+                      <SelectItem value="social_concern">Social concern</SelectItem>
+                      <SelectItem value="citizen_report">Citizen report</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[12px] font-medium text-[#6e6e73]">Location</label>
+                  <Input className="h-11 rounded-2xl bg-[#f5f5f7] font-medium" value={location} onChange={(event) => setLocation(event.target.value)} />
+                </div>
                 <Button className="h-11 w-full rounded-full font-medium" disabled={sending || !location.trim()} type="submit">
                   {sending ? "Sending..." : "Submit signal"}
                 </Button>
@@ -228,24 +229,14 @@ export default function DashboardPage() {
             <CardTitle className="text-lg font-medium tracking-[-0.03em]">Situation map</CardTitle>
             <p className="mt-1 text-sm text-[#6e6e73]">Named gates from live incidents</p>
           </CardHeader>
-          <CardContent className="p-6">
-            <div className="relative min-h-[420px] overflow-hidden rounded-[1.4rem] bg-[#eef1f4]">
-              <div className="absolute inset-x-[-8%] top-[46%] h-16 -rotate-2 bg-white/70" />
-              <div className="absolute inset-y-[-8%] left-[49%] w-14 rotate-12 bg-white/70" />
-              {plotted.map((item) => (
-                <Tooltip key={item.id}>
-                  <TooltipTrigger render={<Link href={`/incidents/${item.id}`} className="absolute z-10 flex -translate-x-1 -translate-y-1 items-center gap-2 text-[11px] font-medium uppercase transition-transform hover:scale-105" style={positions[item.location] ?? { left: "50%", top: "50%" }} />}>
-                    <span className={`size-3 rounded-full ${item.severity === "CRITICAL" || item.severity === "HIGH" ? "bg-[#0071e3]" : "bg-[#1d1d1f]"}`} />
-                    {label(item.location)}
-                  </TooltipTrigger>
-                  <TooltipContent className="rounded-xl" side="right">
-                    <p className="font-medium">{label(item.type)}</p>
-                    <p className="text-[12px] text-white/70">{item.severity} · {Math.round(item.risk * 100)}%</p>
-                  </TooltipContent>
-                </Tooltip>
-              ))}
-              {!plotted.length && <p className="absolute inset-x-0 top-1/2 text-center text-sm text-[#6e6e73]">No active incidents to plot.</p>}
-            </div>
+          <CardContent className="p-0">
+            {plotted.length > 0 ? (
+              <SituationMap incidents={plotted} />
+            ) : (
+              <div className="flex min-h-[420px] items-center justify-center rounded-[1.4rem] bg-[#eef1f4]">
+                <p className="text-sm text-[#6e6e73]">No active incidents to plot.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
