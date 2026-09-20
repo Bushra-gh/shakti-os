@@ -1,64 +1,102 @@
-"use client";
-
+import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { ArrowUpRight, Radio, ShieldCheck, Waypoints } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import { apiUrl, getEvents, getIncidents, submitEvent, websocketUrl, type Event, type Incident } from "@/lib/api";
-import { subscribeWithReconnect, type ConnectionState } from "@/lib/realtime";
+import { Card, CardContent } from "@/components/ui/card";
 
-const positions: Record<string, { left: string; top: string }> = { gate_1: { left: "18%", top: "28%" }, gate_2: { left: "72%", top: "24%" }, gate_3: { left: "78%", top: "72%" }, gate_4: { left: "26%", top: "70%" }, gate_9: { left: "50%", top: "48%" } };
-const label = (value: string) => value.replaceAll("_", " ");
-const severityClass = (value: string) => value === "HIGH" || value === "CRITICAL" ? "bg-[#a8442b] text-[#fff8ef]" : value === "MEDIUM" ? "bg-[#e7c17c]" : "bg-[#c9dfc9]";
+export default function LandingPage() {
+  return (
+    <main className="min-h-screen bg-white text-[#1d1d1f]">
+      <nav className="flex items-center justify-between px-6 py-6 sm:px-12 lg:px-20">
+        <span className="text-sm font-medium tracking-[0.18em]">SHAKTIOS</span>
+        <Link href="/dashboard"><Button className="rounded-full px-5 font-medium" size="sm">Open command center</Button></Link>
+      </nav>
 
-export default function Home() {
-  const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [incidentState, setIncidentState] = useState<ConnectionState>("CONNECTING");
-  const [eventState, setEventState] = useState<ConnectionState>("CONNECTING");
-  const [eventType, setEventType] = useState("crowd_density");
-  const [location, setLocation] = useState("gate_4");
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
+      <section className="mx-auto max-w-5xl px-6 pb-28 pt-16 text-center sm:px-10 lg:pt-28">
+        <p className="text-[13px] font-medium tracking-[0.18em] text-[#6e6e73] uppercase">Event-driven intelligence</p>
+        <h1 className="mx-auto mt-6 max-w-4xl text-[clamp(3.4rem,8vw,7.5rem)] font-medium leading-[0.92] tracking-[-0.07em]">Signals become situations. Situations stay human.</h1>
+        <p className="mx-auto mt-8 max-w-2xl text-lg font-light leading-8 text-[#6e6e73] sm:text-xl">
+          ShaktiOS fuses crowd density, social concern, abnormal movement, and citizen reports into one evolving incident. Risk is explainable. Response is approved by an operator, then recorded.
+        </p>
+        <div className="mt-10 flex flex-wrap justify-center gap-3">
+          <Link href="/dashboard"><Button size="lg" className="rounded-full px-7 font-medium">Enter command center <ArrowUpRight /></Button></Link>
+          <a href="#system"><Button variant="outline" size="lg" className="rounded-full px-7 font-medium">See the loop</Button></a>
+        </div>
+      </section>
 
-  useEffect(() => {
-    Promise.all([fetch(`${apiUrl}/health`), getIncidents(), getEvents()]).then(async ([health, nextIncidents, nextEvents]) => {
-      if (!health.ok) throw new Error("Health check failed");
-      setIncidents(nextIncidents); setEvents(nextEvents);
-    }).catch(() => setError(true)).finally(() => setLoading(false));
-    const stopIncidents = subscribeWithReconnect(websocketUrl("/ws/incidents"), (data) => {
-      const update = JSON.parse(data) as { type: string; incident: Incident };
-      if (update.type === "incident.updated") setIncidents((current) => [...current.filter((item) => item.id !== update.incident.id), update.incident].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 50));
-    }, setIncidentState);
-    const stopEvents = subscribeWithReconnect(websocketUrl("/ws/events"), (data) => {
-      const update = JSON.parse(data) as { type: string; event: Event };
-      if (update.type === "event.created") setEvents((current) => [update.event, ...current].slice(0, 50));
-    }, setEventState);
-    return () => { stopIncidents(); stopEvents(); };
-  }, []);
+      <section id="system" className="mx-auto grid max-w-6xl gap-4 px-6 pb-24 sm:grid-cols-2 lg:grid-cols-4 sm:px-10">
+        {[
+          ["01", "Detect", "Normalize fragmented observations into a shared event language."],
+          ["02", "Correlate", "Group independent evidence by location and time into one incident."],
+          ["03", "Estimate", "Compute explainable risk from density, velocity, movement, and reports."],
+          ["04", "Decide", "Operators approve status changes and request response workflows."],
+        ].map(([index, title, copy]) => (
+          <Card key={title} className="rounded-[1.75rem] bg-[#f5f5f7] py-0 ring-0">
+            <CardContent className="p-8">
+              <p className="text-[12px] font-medium text-[#6e6e73]">{index}</p>
+              <h2 className="mt-8 text-2xl font-medium tracking-[-0.04em]">{title}</h2>
+              <p className="mt-3 text-sm leading-7 text-[#6e6e73]">{copy}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
 
-  const submit = async (formEvent: React.FormEvent<HTMLFormElement>) => {
-    formEvent.preventDefault(); setSending(true); setSent(false);
-    try { const created = await submitEvent({ type: eventType, source: "dashboard_demo", location, confidence: 0.9, payload: eventType === "crowd_density" ? { density: 0.72 } : { score: 0.72, velocity: 0.72 } }); setEvents((current) => [created, ...current].slice(0, 50)); setSent(true); } catch { setError(true); } finally { setSending(false); }
-  };
+      <section className="mx-auto max-w-6xl px-6 pb-24 sm:px-10">
+        <div className="mb-8 max-w-2xl">
+          <h2 className="text-4xl font-medium tracking-[-0.05em] sm:text-5xl">A command surface, not a black box.</h2>
+          <p className="mt-4 text-lg font-light leading-8 text-[#6e6e73]">ShaktiOS does not predict riots or replace operators. It gives situational awareness and a durable audit trail for human-approved action.</p>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="rounded-[1.75rem] bg-[#f5f5f7] py-0 ring-0 lg:col-span-2">
+            <CardContent className="flex min-h-[280px] flex-col justify-between p-8 sm:p-10">
+              <Radio className="size-7 text-[#0071e3]" />
+              <div>
+                <h3 className="text-3xl font-medium tracking-[-0.04em]">Review evidence. Approve the next state.</h3>
+                <p className="mt-3 max-w-xl text-[#6e6e73]">Move an incident from detected to assessing, responding, or resolved. Every decision is timestamped.</p>
+                <Link href="/dashboard" className="mt-6 inline-flex"><Button className="rounded-full font-medium">Open live incidents <ArrowUpRight /></Button></Link>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="rounded-[1.75rem] bg-[#1d1d1f] py-0 text-white ring-0">
+            <CardContent className="flex min-h-[280px] flex-col justify-between p-8">
+              <ShieldCheck className="size-7" />
+              <div>
+                <h3 className="text-2xl font-medium tracking-[-0.04em]">Human-approved handoff</h3>
+                <p className="mt-3 text-sm leading-7 text-white/70">When an incident is responding, operators can request an n8n workflow. ShaktiOS never acts autonomously.</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="rounded-[1.75rem] bg-[#f5f5f7] py-0 ring-0">
+            <CardContent className="p-8">
+              <Waypoints className="mb-10 size-7 text-[#0071e3]" />
+              <h3 className="text-2xl font-medium tracking-[-0.04em]">Timeline as memory</h3>
+              <p className="mt-3 leading-7 text-[#6e6e73]">Correlated events, status changes, and requested actions stay in one chronological record.</p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-[1.75rem] bg-[#f5f5f7] py-0 ring-0 lg:col-span-2">
+            <CardContent className="grid min-h-[220px] gap-8 p-8 sm:grid-cols-3">
+              {[["Crowd", "Density and movement from the physical world."], ["Social", "Normalized Civic-Shield concern signals."], ["Citizen", "Public reports without exposing identity."]].map(([title, copy]) => (
+                <div key={title}>
+                  <h4 className="text-xl font-medium">{title}</h4>
+                  <p className="mt-3 text-sm leading-7 text-[#6e6e73]">{copy}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
-  const active = incidents.filter((item) => item.status !== "RESOLVED");
-  const elevated = active.filter((item) => ["HIGH", "CRITICAL"].includes(item.severity)).length;
-  const plotted = useMemo(() => active.slice(0, 8), [active]);
-  const connected = incidentState === "LIVE" && eventState === "LIVE";
-
-  return <main className="mx-auto min-h-screen max-w-[1440px] bg-[var(--background)] px-5 py-8 text-[var(--foreground)] sm:px-12 sm:py-10">
-    <header className="flex items-end justify-between gap-6"><div><p className="font-mono text-[.7rem] uppercase tracking-[.08em] text-[var(--accent-dark)]">Operational command center / 02</p><h1 className="mt-2 text-6xl font-extrabold leading-[.8] tracking-[-.06em] sm:text-8xl">SHAKTIOS</h1></div><div className="font-mono text-[.65rem] uppercase tracking-[.08em] text-[var(--muted)]"><span className={`mr-2 inline-block size-2 rounded-full ${connected ? "bg-[#3f8d59]" : "bg-[var(--accent-dark)]"}`} />INCIDENTS {incidentState} / EVENTS {eventState}</div></header>
-    <div className="my-8 h-px bg-[var(--line)]" />
-    <section className="grid gap-4 sm:grid-cols-3"><Card><CardHeader><CardTitle>Active incidents</CardTitle></CardHeader><CardContent className="text-4xl font-bold">{active.length.toString().padStart(2, "0")}</CardContent></Card><Card><CardHeader><CardTitle>Elevated risk</CardTitle></CardHeader><CardContent className={`text-4xl font-bold ${elevated ? "text-[var(--accent-dark)]" : ""}`}>{elevated.toString().padStart(2, "0")}</CardContent></Card><Card><CardHeader><CardTitle>Signals / latest 50</CardTitle></CardHeader><CardContent className="text-4xl font-bold">{events.length.toString().padStart(2, "0")}</CardContent></Card></section>
-    {error && <p className="my-5 font-mono text-xs uppercase tracking-[.08em] text-[var(--accent-dark)]">API unavailable. Start the ShaktiOS API to connect the command center.</p>}
-    <section className="mt-4 grid gap-4 lg:grid-cols-[1.15fr_.85fr]"><Card className="min-h-[510px]"><CardHeader><CardTitle>Location overview</CardTitle><p className="mt-1 font-mono text-[.62rem] uppercase tracking-[.08em] text-[var(--muted)]">Live incident positions / named gates</p></CardHeader><CardContent><div className="relative min-h-[400px] overflow-hidden border border-[var(--line)] bg-[#e7eadf] before:absolute before:inset-0 before:bg-[linear-gradient(45deg,#bcc5b7_25%,transparent_25%),linear-gradient(-45deg,#bcc5b7_25%,transparent_25%)] before:bg-[length:32px_32px] before:opacity-35"><div className="absolute left-[-5%] right-[-5%] top-[47%] z-[1] h-11 -rotate-2 bg-[#f7f4e9] shadow-[0_0_0_1px_#d5d8cb]" /><div className="absolute bottom-[-5%] left-[49%] top-[-5%] z-[1] w-10 rotate-[18deg] bg-[#f7f4e9] shadow-[0_0_0_1px_#d5d8cb]" /><span className="absolute left-3 top-3 z-[2] font-mono text-[.62rem] tracking-[.1em] text-[#778274]">NORTH PLAZA</span><span className="absolute bottom-3 right-3 z-[2] font-mono text-[.62rem] tracking-[.1em] text-[#778274]">SOUTH ACCESS</span>{plotted.map((item) => <Link key={item.id} href={`/incidents/${item.id}`} className="absolute z-[3] flex -translate-x-1 -translate-y-1 items-center gap-2 font-mono text-[.65rem] uppercase" style={positions[item.location] ?? { left: "50%", top: "50%" }}><span className={`size-3 rounded-full border-2 border-[var(--panel)] ${severityClass(item.severity)}`} />{label(item.location)}</Link>)}{!plotted.length && <p className="absolute inset-x-0 top-1/2 text-center font-mono text-xs text-[var(--muted)]">No active incidents to plot.</p>}</div></CardContent></Card><Card className="min-h-[510px]"><CardHeader><CardTitle>Incident queue</CardTitle><p className="mt-1 font-mono text-[.62rem] uppercase tracking-[.08em] text-[var(--muted)]">Correlated situations / newest first</p></CardHeader><CardContent className="pt-0">{loading && <p className="font-mono text-xs text-[var(--muted)]">Loading operational data...</p>}{!loading && !incidents.length && <p className="font-mono text-xs text-[var(--muted)]">No incidents detected yet.</p>}{incidents.map((item) => <Link className="flex items-center justify-between gap-4 border-b border-[var(--line)] py-4" href={`/incidents/${item.id}`} key={item.id}><div><strong className="block text-sm capitalize">{label(item.type)}</strong><span className="mt-1 block font-mono text-[.62rem] uppercase tracking-[.08em] text-[var(--muted)]">{label(item.location)} / {item.status}</span></div><div className="flex items-center gap-3"><Badge className={severityClass(item.severity)}>{item.severity}</Badge><strong className="font-mono text-xs">{Math.round(item.risk * 100)}%</strong></div></Link>)}</CardContent></Card></section>
-    <section className="mt-4"><Card><CardHeader><CardTitle>Signal intake</CardTitle><p className="mt-1 font-mono text-[.62rem] uppercase tracking-[.08em] text-[var(--muted)]">Manual demo event / POST /events</p></CardHeader><CardContent><form className="grid items-end gap-4 sm:grid-cols-[1fr_1fr_auto]" onSubmit={submit}><label className="font-mono text-[.68rem] uppercase text-[var(--muted)]">Signal type<select className="mt-2 block h-9 w-full border border-[var(--line)] bg-[var(--panel)] px-2 font-mono text-xs" value={eventType} onChange={(event) => setEventType(event.target.value)}><option value="crowd_density">Crowd density</option><option value="abnormal_movement">Abnormal movement</option><option value="social_concern">Social concern</option><option value="citizen_report">Citizen report</option></select></label><label className="font-mono text-[.68rem] uppercase text-[var(--muted)]">Location<Input value={location} onChange={(event) => setLocation(event.target.value)} /></label><Button disabled={sending || !location.trim()}>{sending ? "Sending..." : "Submit signal"}</Button></form>{sent && <p className="mt-3 text-xs text-[#3f8d59]">Signal accepted. Incident correlation and realtime updates should follow.</p>}</CardContent></Card></section>
-    <section className="mt-14"><div className="mb-4 flex items-end justify-between gap-6"><div><p className="font-mono text-[.7rem] uppercase tracking-[.08em] text-[var(--accent-dark)]">Evidence intake</p><h2 className="mt-2 text-4xl tracking-[-.05em]">Latest signals</h2></div><span className="font-mono text-xs text-[var(--muted)]">{events.length} retained</span></div><Separator /><div>{events.slice(0, 8).map((item) => <div className="grid items-center gap-4 border-b border-[var(--line)] py-3 font-mono text-xs uppercase sm:grid-cols-[150px_1fr_1fr_110px]" key={item.id}><Badge className="w-fit" variant="outline">{label(item.type)}</Badge><span>{label(item.location)}</span><span className="text-[var(--accent-dark)]">{item.source}</span><time className="sm:text-right">{new Date(item.timestamp).toLocaleTimeString()}</time></div>)}{!loading && !events.length && <p className="py-4 font-mono text-xs text-[var(--muted)]">No signals have arrived yet.</p>}</div></section>
-  </main>;
+      <footer className="mt-8">
+        <div className="relative h-[280px] overflow-hidden sm:h-[360px]">
+          <Image src="/footer-field.svg" alt="Quiet civic field under observation" fill className="object-cover" priority={false} />
+          <div className="absolute inset-0 bg-gradient-to-t from-white via-white/40 to-transparent" />
+        </div>
+        <div className="flex flex-col items-start justify-between gap-4 bg-white px-6 py-8 text-sm text-[#6e6e73] sm:flex-row sm:items-center sm:px-12 lg:px-20">
+          <span className="font-medium tracking-[0.16em] text-[#1d1d1f]">SHAKTIOS</span>
+          <span>HackSpire 2026 · Human-approved intelligence</span>
+          <Link href="/dashboard" className="font-medium text-[#1d1d1f]">Command center</Link>
+        </div>
+      </footer>
+    </main>
+  );
 }

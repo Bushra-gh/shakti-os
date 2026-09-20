@@ -53,6 +53,8 @@ Start local PostgreSQL when needed:
 docker compose up -d
 ```
 
+Docker Desktop must be installed and running for PostgreSQL. For a no-Docker smoke test, set `DATABASE_URL=sqlite+pysqlite:///./shaktios-local.db` before starting the API.
+
 ## Run the frontend
 
 Run the dashboard through Turborepo:
@@ -92,6 +94,8 @@ python -m shaktios_crowd_simulator.main
 ```
 
 The simulator sends one deterministic event to the API. Add `--dry-run` to print without sending, or set `SHAKTIOS_API_URL` to use another API base URL.
+
+The API and simulator use separate virtual environments. Run the simulator with `simulator/crowd/.venv\Scripts\python.exe`, not the API virtual environment.
 
 ## Development commands
 

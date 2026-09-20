@@ -14,3 +14,9 @@ python -m shaktios_crowd_simulator.main --api-url http://localhost:8000
 ```
 
 The API URL can also be set with `SHAKTIOS_API_URL`.
+
+Run this package with `simulator/crowd/.venv`, not `services/api/.venv`:
+
+```powershell
+.\.venv\Scripts\python.exe -m shaktios_crowd_simulator.main
+```
