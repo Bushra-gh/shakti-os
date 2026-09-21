@@ -22,6 +22,8 @@ docs/                           Architecture and workflow documentation
 
 The repository also retains the shared ESLint, TypeScript, and UI packages from the initial Turborepo setup.
 
+For an evaluation-ready overview of the architecture, routes, database schema, demo flow, and current limitations, see [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md).
+
 ## Prerequisites
 
 - Node.js 24+
