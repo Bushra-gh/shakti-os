@@ -14,10 +14,10 @@ const gateCoordinates: Record<string, [number, number]> = {
 };
 
 const severityColor: Record<string, string> = {
-  CRITICAL: "#d70015",
-  HIGH: "#0071e3",
-  MEDIUM: "#6e6e73",
-  LOW: "#d2d2d7",
+  CRITICAL: "var(--severity-critical)",
+  HIGH: "var(--severity-high)",
+  MEDIUM: "var(--severity-medium)",
+  LOW: "var(--severity-low)",
 };
 
 const label = (value: string) => value.replaceAll("_", " ");
@@ -56,8 +56,8 @@ export default function SituationMap({ incidents }: { incidents: Incident[] }) {
               center={coords}
               radius={incident.severity === "CRITICAL" ? 10 : incident.severity === "HIGH" ? 8 : 6}
               pathOptions={{
-                color: severityColor[incident.severity] ?? "#6e6e73",
-                fillColor: severityColor[incident.severity] ?? "#6e6e73",
+                color: severityColor[incident.severity] ?? "var(--severity-medium)",
+                fillColor: severityColor[incident.severity] ?? "var(--severity-medium)",
                 fillOpacity: 0.85,
                 weight: 2,
               }}
@@ -65,19 +65,19 @@ export default function SituationMap({ incidents }: { incidents: Incident[] }) {
               <Popup className="rounded-xl">
                 <div className="min-w-[160px] p-1">
                   <p className="text-sm font-semibold capitalize">{label(incident.type)}</p>
-                  <p className="mt-0.5 text-xs text-gray-500">{label(incident.location)}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{label(incident.location)}</p>
                   <div className="mt-2 flex items-center gap-2 text-xs">
                     <span
                       className="inline-block h-2 w-2 rounded-full"
                       style={{ backgroundColor: severityColor[incident.severity] }}
                     />
                     <span className="font-medium">{incident.severity}</span>
-                    <span className="text-gray-400">·</span>
+                    <span className="text-muted-foreground">·</span>
                     <span>{Math.round(incident.risk * 100)}% risk</span>
                   </div>
                   <Link
                     href={`/incidents/${incident.id}`}
-                    className="mt-3 inline-block text-xs font-medium text-blue-600 hover:underline"
+                    className="mt-3 inline-block text-xs font-medium text-info hover:underline"
                   >
                     View details →
                   </Link>

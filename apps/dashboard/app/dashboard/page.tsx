@@ -141,14 +141,14 @@ export default function DashboardPage() {
   const plotted = useMemo(() => active.slice(0, 8), [active]);
 
   return (
-    <main className="min-h-screen w-full bg-[#f5f5f7] px-4 py-6 text-[#1d1d1f] sm:px-8 lg:px-10">
+    <main className="min-h-screen w-full bg-background px-4 py-6 text-foreground sm:px-8 lg:px-10">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Link href="/" className="flex size-10 items-center justify-center rounded-[1.1rem] bg-[#1d1d1f] text-white">
+          <Link href="/" className="flex size-10 items-center justify-center rounded-[1.1rem] bg-foreground text-background">
             <Command className="size-4" />
           </Link>
           <div>
-            <p className="text-[11px] font-medium tracking-[0.16em] text-[#6e6e73] uppercase">Command center</p>
+            <p className="text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase">Command center</p>
             <h1 className="text-[28px] font-medium tracking-[-0.04em]">ShaktiOS</h1>
           </div>
         </div>
@@ -163,9 +163,9 @@ export default function DashboardPage() {
               </DialogHeader>
               <form className="space-y-4 pt-2" onSubmit={submit}>
                 <div className="space-y-2">
-                  <label className="text-[12px] font-medium text-[#6e6e73]">Signal type</label>
+                  <label className="text-[12px] font-medium text-muted-foreground">Signal type</label>
                   <Select value={eventType} onValueChange={(v) => v && setEventType(v)}>
-                    <SelectTrigger className="h-11 w-full rounded-2xl bg-[#f5f5f7] font-medium">
+                    <SelectTrigger className="h-11 w-full rounded-2xl bg-muted font-medium">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -177,19 +177,19 @@ export default function DashboardPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[12px] font-medium text-[#6e6e73]">Location</label>
-                  <Input className="h-11 rounded-2xl bg-[#f5f5f7] font-medium" value={location} onChange={(event) => setLocation(event.target.value)} />
+                  <label className="text-[12px] font-medium text-muted-foreground">Location</label>
+                  <Input className="h-11 rounded-2xl bg-muted font-medium" value={location} onChange={(event) => setLocation(event.target.value)} />
                 </div>
                 <Button className="h-11 w-full rounded-full font-medium" disabled={sending || !location.trim()} type="submit">
                   {sending ? "Sending..." : "Submit signal"}
                 </Button>
-                {sent && <p className="flex items-center gap-2 text-sm font-medium text-[#34c759]"><CheckCircle2 className="size-4" />Signal accepted.</p>}
+                {sent && <p className="flex items-center gap-2 text-sm font-medium text-success"><CheckCircle2 className="size-4" />Signal accepted.</p>}
               </form>
             </DialogContent>
           </Dialog>
           <Tooltip>
-            <TooltipTrigger render={<div className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[12px] font-medium text-[#6e6e73] shadow-[0_1px_0_rgba(0,0,0,.04)]" />}>
-              <span className={`size-2 rounded-full ${connected ? "bg-[#34c759]" : "bg-[#ff9f0a]"}`} />
+            <TooltipTrigger render={<div className="flex items-center gap-2 rounded-full bg-card px-4 py-2 text-[12px] font-medium text-muted-foreground shadow-sm" />}>
+              <span className={`size-2 rounded-full ${connected ? "bg-success" : "bg-warning"}`} />
               {connected ? "Live" : incidentState.toLowerCase()}
             </TooltipTrigger>
             <TooltipContent side="bottom" className="rounded-xl">Incidents: {incidentState.toLowerCase()} · Events: {eventState.toLowerCase()}</TooltipContent>
@@ -198,8 +198,8 @@ export default function DashboardPage() {
       </header>
 
       {error && (
-        <Card className="mb-6 rounded-[1.75rem] bg-white ring-0">
-          <CardContent className="px-6 py-4 text-sm font-medium text-[#d70015]">API unavailable. Start the ShaktiOS API to connect live operations.</CardContent>
+        <Card className="mb-6 rounded-[1.75rem] bg-card ring-0">
+          <CardContent className="px-6 py-4 text-sm font-medium text-destructive">API unavailable. Start the ShaktiOS API to connect live operations.</CardContent>
         </Card>
       )}
 
@@ -210,61 +210,61 @@ export default function DashboardPage() {
           { title: "Signals", value: String(events.length).padStart(2, "0"), note: "Latest 50 retained", icon: Radio },
           { title: "Fusion", value: connected ? "Live" : "Wait", note: "Incident + event streams", icon: Signal },
         ].map(({ title, value, note, icon: Icon }) => (
-          <Card key={title} className="group rounded-[1.75rem] bg-white py-0 ring-0 transition-shadow hover:shadow-[0_8px_30px_rgba(0,0,0,.04)]">
+          <Card key={title} className="group rounded-[1.75rem] bg-card py-0 ring-0 transition-shadow hover:shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
-                <p className="text-[12px] font-medium tracking-[0.08em] text-[#6e6e73] uppercase">{title}</p>
-                <Icon className="size-4 text-[#d2d2d7] transition-colors group-hover:text-[#0071e3]" />
+                <p className="text-[12px] font-medium tracking-[0.08em] text-muted-foreground uppercase">{title}</p>
+                <Icon className="size-4 text-muted-foreground transition-colors group-hover:text-info" />
               </div>
               <p className="mt-6 text-4xl font-medium tracking-[-0.06em]">{value}</p>
-              <p className="mt-2 text-sm text-[#6e6e73]">{note}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{note}</p>
             </CardContent>
           </Card>
         ))}
       </section>
 
       <section className="mt-4 grid gap-4 xl:grid-cols-[1.4fr_.9fr]">
-        <Card className="rounded-[1.75rem] bg-white py-0 ring-0">
+        <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
           <CardHeader className="px-6 pt-6 pb-0">
             <CardTitle className="text-lg font-medium tracking-[-0.03em]">Situation map</CardTitle>
-            <p className="mt-1 text-sm text-[#6e6e73]">Named gates from live incidents</p>
+            <p className="mt-1 text-sm text-muted-foreground">Named gates from live incidents</p>
           </CardHeader>
           <CardContent className="p-0">
             {plotted.length > 0 ? (
               <SituationMap incidents={plotted} />
             ) : (
-              <div className="flex min-h-[420px] items-center justify-center rounded-[1.4rem] bg-[#eef1f4]">
-                <p className="text-sm text-[#6e6e73]">No active incidents to plot.</p>
+              <div className="flex min-h-[420px] items-center justify-center rounded-[1.4rem] bg-muted">
+                <p className="text-sm text-muted-foreground">No active incidents to plot.</p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="rounded-[1.75rem] bg-white py-0 ring-0">
+        <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
           <CardHeader className="px-6 pt-6 pb-0">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg font-medium tracking-[-0.03em]">Incident queue</CardTitle>
-                <p className="mt-1 text-sm text-[#6e6e73]">Newest correlated situations</p>
+                <p className="mt-1 text-sm text-muted-foreground">Newest correlated situations</p>
               </div>
               <Badge variant="outline">{active.length}</Badge>
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            {loading && <p className="px-6 py-8 text-sm text-[#6e6e73]">Loading operational data...</p>}
+            {loading && <p className="px-6 py-8 text-sm text-muted-foreground">Loading operational data...</p>}
             {!loading && !active.length && (
               <div className="px-6 py-10 text-center">
-                <CheckCircle2 className="mx-auto size-6 text-[#34c759]" />
+                <CheckCircle2 className="mx-auto size-6 text-success" />
                 <p className="mt-3 font-medium">No active incidents</p>
               </div>
             )}
             <ScrollArea className="max-h-[380px]">
               <div className="space-y-1 px-3 pb-3">
                 {active.slice(0, 8).map((item) => (
-                  <Link key={item.id} href={`/incidents/${item.id}`} className="flex items-center justify-between rounded-[1.25rem] px-4 py-4 transition-colors hover:bg-[#f5f5f7]">
+                  <Link key={item.id} href={`/incidents/${item.id}`} className="flex items-center justify-between rounded-[1.25rem] px-4 py-4 transition-colors hover:bg-muted">
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium capitalize">{label(item.type)}</p>
-                      <p className="mt-1 flex items-center gap-1 text-[12px] text-[#6e6e73]"><MapPinned className="size-3 shrink-0" />{label(item.location)}</p>
+                      <p className="mt-1 flex items-center gap-1 text-[12px] text-muted-foreground"><MapPinned className="size-3 shrink-0" />{label(item.location)}</p>
                     </div>
                     <div className="ml-4 flex shrink-0 items-center gap-3">
                       <Badge variant={severityVariant[item.severity] ?? "outline"}>{item.severity}</Badge>
@@ -279,22 +279,22 @@ export default function DashboardPage() {
       </section>
 
       <section className="mt-4">
-        <Card className="rounded-[1.75rem] bg-white py-0 ring-0">
+        <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
           <CardHeader className="px-6 pt-6 pb-0">
             <CardTitle className="text-lg font-medium tracking-[-0.03em]">Activity feed</CardTitle>
-            <p className="mt-1 text-sm text-[#6e6e73]">Incidents and events in one view</p>
+            <p className="mt-1 text-sm text-muted-foreground">Incidents and events in one view</p>
           </CardHeader>
           <CardContent className="p-0">
             <Tabs defaultValue="incidents" className="px-6 pt-4">
-              <TabsList className="mb-4 rounded-full bg-[#f5f5f7] p-1">
+              <TabsList className="mb-4 rounded-full bg-muted p-1">
                 <TabsTrigger className="rounded-full px-4 font-medium" value="incidents">Incidents</TabsTrigger>
                 <TabsTrigger className="rounded-full px-4 font-medium" value="events">Events</TabsTrigger>
               </TabsList>
               <TabsContent value="incidents">
                 {loading ? (
-                  <p className="py-8 text-sm text-[#6e6e73]">Loading...</p>
+                  <p className="py-8 text-sm text-muted-foreground">Loading...</p>
                 ) : incidents.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-[#6e6e73]">No incidents yet.</p>
+                  <p className="py-8 text-center text-sm text-muted-foreground">No incidents yet.</p>
                 ) : (
                   <ScrollArea className="max-h-[340px]">
                     <Table>
@@ -309,8 +309,8 @@ export default function DashboardPage() {
                       <TableBody>
                         {incidents.slice(0, 10).map((item) => (
                           <TableRow key={item.id}>
-                            <TableCell><Link href={`/incidents/${item.id}`} className="font-medium capitalize hover:text-[#0071e3]">{label(item.type)}</Link></TableCell>
-                            <TableCell className="capitalize text-[#6e6e73]">{label(item.location)}</TableCell>
+                            <TableCell><Link href={`/incidents/${item.id}`} className="font-medium capitalize hover:text-info">{label(item.type)}</Link></TableCell>
+                            <TableCell className="capitalize text-muted-foreground">{label(item.location)}</TableCell>
                             <TableCell><Badge variant={statusVariant[item.status] ?? "outline"}>{item.status}</Badge></TableCell>
                             <TableCell className="text-right font-medium">{Math.round(item.risk * 100)}%</TableCell>
                           </TableRow>
@@ -322,9 +322,9 @@ export default function DashboardPage() {
               </TabsContent>
               <TabsContent value="events">
                 {loading ? (
-                  <p className="py-8 text-sm text-[#6e6e73]">Loading...</p>
+                  <p className="py-8 text-sm text-muted-foreground">Loading...</p>
                 ) : events.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-[#6e6e73]">No signals have arrived yet.</p>
+                  <p className="py-8 text-center text-sm text-muted-foreground">No signals have arrived yet.</p>
                 ) : (
                   <ScrollArea className="max-h-[340px]">
                     <Table>
@@ -340,9 +340,9 @@ export default function DashboardPage() {
                         {events.slice(0, 10).map((item) => (
                           <TableRow key={item.id}>
                             <TableCell className="font-medium capitalize">{label(item.type)}</TableCell>
-                            <TableCell className="capitalize text-[#6e6e73]">{label(item.location)}</TableCell>
-                            <TableCell className="text-[#6e6e73]">{item.source}</TableCell>
-                            <TableCell className="text-right text-[12px] text-[#6e6e73]">{formatDateTime(item.timestamp)}</TableCell>
+                            <TableCell className="capitalize text-muted-foreground">{label(item.location)}</TableCell>
+                            <TableCell className="text-muted-foreground">{item.source}</TableCell>
+                            <TableCell className="text-right text-[12px] text-muted-foreground">{formatDateTime(item.timestamp)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -355,11 +355,11 @@ export default function DashboardPage() {
         </Card>
       </section>
 
-      <Separator className="my-8 bg-[#d2d2d7]" />
+      <Separator className="my-8 bg-border" />
 
-      <footer className="flex items-center justify-between pb-4 text-[12px] font-medium text-[#6e6e73]">
+      <footer className="flex items-center justify-between pb-4 text-[12px] font-medium text-muted-foreground">
         <span>Human-approved response</span>
-        <Link href="/" className="inline-flex items-center gap-1 hover:text-[#1d1d1f]">Overview <ArrowUpRight className="size-3" /></Link>
+        <Link href="/" className="inline-flex items-center gap-1 hover:text-foreground">Overview <ArrowUpRight className="size-3" /></Link>
       </footer>
     </main>
   );
