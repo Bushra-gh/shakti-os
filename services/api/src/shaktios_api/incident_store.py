@@ -80,6 +80,12 @@ def correlate_event(db: Session, event: Event, event_record: EventRecord) -> Inc
             updated_at=event.timestamp,
         )
         db.add(incident)
+        # Flush the INSERT now: events.incident_id references this row, and
+        # databases with enforced foreign keys (PostgreSQL/Supabase) reject
+        # a flush that UPDATEs events before the incident row exists.
+        # (SQLite silently tolerates it with FK enforcement off, which hid
+        # this ordering bug in local testing.)
+        db.flush()
     else:
         incident.updated_at = max(incident.updated_at, event.timestamp)
         incident.confidence = max(incident.confidence, event.confidence)

@@ -29,6 +29,13 @@ Validates, persists, and logs one event, then returns the persisted normalized e
 
 The response has status `201` and includes the generated `id` and UTC `timestamp`.
 
+Authentication is via Supabase Auth: citizen clients send
+`Authorization: Bearer <supabase_access_token>`. The token is optional
+for machine signal sources, but a present-but-invalid token is rejected
+with `401`. For `citizen_report` events, any client-supplied identity is
+stripped and `reporter_id` is stamped server-side from the verified JWT
+`sub` (see `docs/SUPABASE.md`). `GET /me` returns the verified identity.
+
 ## `GET /events`
 
 Returns persisted events ordered newest first. The optional `limit` query parameter defaults to `50`.

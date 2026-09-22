@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
+from shaktios_api.auth import AuthUser, get_current_user, get_optional_user
 from shaktios_api.database import create_tables, get_db
 from shaktios_api.event_store import EventRecord, list_events, save_event
 from shaktios_api.incident_models import ActionDelivery, Incident, IncidentAction, IncidentStatus, IncidentStatusUpdate
@@ -28,9 +29,16 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="ShaktiOS API", version="0.1.0", lifespan=lifespan)
 
+def cors_origins() -> list[str]:
+    raw = os.getenv("CORS_ORIGINS", "http://localhost:3000").strip()
+    if raw == "*":
+        return ["*"]
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,8 +50,30 @@ def health() -> dict[str, str]:
     return {"status": "ok", "service": "shaktios-api"}
 
 
+@app.get("/me")
+def me(user: AuthUser = Depends(get_current_user)) -> dict[str, str | None]:
+    """Return the verified Supabase identity (auth check for clients)."""
+    return {"id": user.id, "email": user.email, "role": user.role}
+
+
+# Client-supplied identity keys are never trusted. They are stripped from
+# citizen_report payloads; the verified JWT sub is stamped server-side.
+_UNTRUSTED_IDENTITY_KEYS = {"reporter_id", "user_id", "reporter", "userId"}
+
+
 @app.post("/events", response_model=Event, status_code=201)
-async def ingest_event(event: Event, db: Session = Depends(get_db)) -> Event:
+async def ingest_event(
+    event: Event,
+    db: Session = Depends(get_db),
+    user: AuthUser | None = Depends(get_optional_user),
+) -> Event:
+    if event.type == "citizen_report":
+        sanitized = {k: v for k, v in event.payload.items() if k not in _UNTRUSTED_IDENTITY_KEYS}
+        event.payload = sanitized
+        # Server-authoritative attribution: verified JWT sub or anonymous.
+        event.reporter_id = user.id if user is not None else None
+    else:
+        event.reporter_id = None
     persisted_event = save_event(db, event)
     event_record = db.get(EventRecord, persisted_event.id)
     incident = None

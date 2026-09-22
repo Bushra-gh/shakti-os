@@ -21,6 +21,7 @@ class EventRecord(Base):
     incident_id: Mapped[str | None] = mapped_column(
         ForeignKey("incidents.id"), nullable=True
     )
+    reporter_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
 def save_event(db: Session, event: Event) -> Event:

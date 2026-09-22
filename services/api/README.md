@@ -2,13 +2,17 @@
 
 FastAPI service for Event, Incident, explainable Risk, realtime updates, timeline, approval, and action handoff workflows.
 
-For local smoke testing without PostgreSQL, set `DATABASE_URL=sqlite+pysqlite:///./shaktios-local.db` before starting the server. The test suite uses isolated in-memory SQLite.
+Supabase PostgreSQL is the runtime database. Set `DATABASE_URL` to the
+Supabase pooler connection string (`...pooler.supabase.com:6543/postgres?sslmode=require`)
+and deploy the schema once with `supabase db push` (migrations live in
+`supabase/migrations/`). For an offline smoke test without Supabase, set
+`DATABASE_URL=sqlite+pysqlite:///./shaktios-local.db` before starting the
+server. The test suite uses isolated in-memory SQLite.
 
-Run the additive schema command before starting the server when using an existing database:
-
-```powershell
-python -m shaktios_api.migrate
-```
+Supabase Auth is the identity provider: citizen clients send
+`Authorization: Bearer <supabase_access_token>`; verification lives in
+`shaktios_api/auth.py`. `GET /me` returns the verified identity.
+See `docs/SUPABASE.md` for the full auth, RLS, and migration workflow.
 
 ```powershell
 python -m venv .venv

@@ -1,0 +1,22 @@
+# Supabase CLI configuration for ShaktiOS.
+# Database schema is managed exclusively through supabase/migrations/.
+# Do NOT create a competing schema-management system (no Alembic).
+
+[project]
+name = "shaktios"
+# Linked via: supabase link --project-ref <SUPABASE_PROJECT_REF>
+
+[db]
+# Supabase PostgreSQL is the sole runtime database.
+# FastAPI connects via DATABASE_URL (pooler URL with sslmode=require).
+# Local PostgreSQL is NOT a runtime dependency.
+
+[auth]
+enabled = true
+# Supabase Auth is the identity provider for the Expo citizen app.
+# FastAPI validates Supabase-issued JWTs (see services/api/src/shaktios_api/auth.py).
+
+[storage]
+enabled = true
+# Private bucket `citizen-evidence` is created by the initial migration
+# for future citizen photo evidence. No backend media endpoint exists yet.

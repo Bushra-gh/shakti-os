@@ -29,7 +29,8 @@ For an evaluation-ready overview of the architecture, routes, database schema, d
 - Node.js 24+
 - pnpm 11+
 - Python 3.11+
-- Docker Desktop (only needed for PostgreSQL)
+- A Supabase project (PostgreSQL + Auth) and the Supabase CLI
+- Docker is no longer required (no local database container)
 
 ## Setup
 
@@ -38,10 +39,13 @@ pnpm install
 Copy-Item .env.example .env
 ```
 
-The local `.env` uses these defaults:
+Fill in `.env` with your Supabase values (see `.env.example`):
 
 ```text
-DATABASE_URL=postgresql://shaktios:shaktios_dev@localhost:5432/shaktios
+DATABASE_URL=postgresql://postgres.YOUR_PROJECT_REF:...@...pooler.supabase.com:6543/postgres?sslmode=require
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+SUPABASE_PUBLISHABLE_KEY=...
+SUPABASE_PROJECT_REF=...
 NEXT_PUBLIC_API_URL=http://localhost:8000
 SHAKTIOS_API_URL=http://localhost:8000
 N8N_WEBHOOK_URL=
@@ -49,13 +53,15 @@ N8N_WEBHOOK_URL=
 
 `N8N_WEBHOOK_URL` is optional until the n8n workflow is hosted and activated.
 
-Start local PostgreSQL when needed:
+Apply the database schema (the single authoritative migration set):
 
 ```powershell
-docker compose up -d
+supabase login
+supabase link --project-ref <SUPABASE_PROJECT_REF>
+supabase db push
 ```
 
-Docker Desktop must be installed and running for PostgreSQL. For a no-Docker smoke test, set `DATABASE_URL=sqlite+pysqlite:///./shaktios-local.db` before starting the API.
+For an offline smoke test without Supabase, set `DATABASE_URL=sqlite+pysqlite:///./shaktios-local.db` before starting the API. SQLite is for smoke tests only — Supabase PostgreSQL is the runtime database.
 
 ## Run the frontend
 
@@ -83,7 +89,7 @@ python -m pip install -e ".[test]"
 uvicorn shaktios_api.main:app --app-dir src --reload --port 8000
 ```
 
-Run `python -m shaktios_api.migrate` before starting the server when using an existing database. Check `http://localhost:8000/health`. Events can be submitted to `POST http://localhost:8000/events` and read with `GET http://localhost:8000/events`; see [docs/API.md](docs/API.md).
+Run `supabase db push` once to deploy the schema before starting the server. Check `http://localhost:8000/health`. Events can be submitted to `POST http://localhost:8000/events` and read with `GET http://localhost:8000/events`; see [docs/API.md](docs/API.md). Supabase Auth is the identity provider for citizen clients; see [docs/SUPABASE.md](docs/SUPABASE.md).
 
 ## Run the simulator
 

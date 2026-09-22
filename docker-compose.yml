@@ -1,15 +1,6 @@
-services:
-  postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-shaktios}
-      POSTGRES_USER: ${POSTGRES_USER:-shaktios}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shaktios_dev}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    volumes:
-      - shaktios-postgres-data:/var/lib/postgresql/data
-
-volumes:
-  shaktios-postgres-data:
+# ShaktiOS no longer runs a local PostgreSQL container.
+# Supabase PostgreSQL is the sole runtime database (see supabase/migrations/
+# and DATABASE_URL in .env.example). This file is kept so `docker compose`
+# commands do not break existing scripts; it intentionally defines no
+# database service.
+services: {}

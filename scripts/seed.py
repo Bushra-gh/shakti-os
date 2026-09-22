@@ -3,11 +3,12 @@ Seed script for ShaktiOS dashboard demo.
 Posts realistic events from Ranchi, Jharkhand locations to the running API.
 """
 
+import os
 import random
 import time
 import httpx
 
-API_URL = "http://localhost:8000"
+API_URL = os.getenv("SHAKTIOS_API_URL", "http://localhost:8000").rstrip("/")
 
 LOCATIONS = {
     "gate_1": "Kanke Road Gate",
