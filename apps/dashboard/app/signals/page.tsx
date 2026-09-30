@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -131,6 +132,7 @@ export default function SignalsPage() {
                     <TableHead scope="col">Source</TableHead>
                     <TableHead scope="col">Location</TableHead>
                     <TableHead scope="col" className="text-right">Confidence</TableHead>
+                    <TableHead scope="col">Incident</TableHead>
                     <TableHead scope="col">Payload</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -156,6 +158,18 @@ export default function SignalsPage() {
                       </TableCell>
                       <TableCell className="text-right font-medium tabular-nums">
                         {Math.round(item.confidence * 100)}%
+                      </TableCell>
+                      <TableCell>
+                        {eventToIncident[item.id] ? (
+                          <Link
+                            href={`/incidents/${eventToIncident[item.id]}`}
+                            className="text-xs font-medium text-info hover:underline"
+                          >
+                            Open →
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-muted-foreground" title="Seen only in the latest retained events; correlation resolves as timelines load.">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="max-w-64 truncate text-xs text-muted-foreground">
                         {payloadSummary(item.payload)}

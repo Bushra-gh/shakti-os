@@ -14,6 +14,7 @@ export function SignalDialog({ onCreated }: { onCreated?: (event: Event) => void
   const [open, setOpen] = useState(false);
   const [eventType, setEventType] = useState<string>("crowd_density");
   const [location, setLocation] = useState("gate_4");
+  const [intensity, setIntensity] = useState(72);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -24,15 +25,18 @@ export function SignalDialog({ onCreated }: { onCreated?: (event: Event) => void
     setSent(false);
     setFailed(false);
     try {
+      const level = intensity / 100;
       const created = await submitEvent({
         type: eventType,
         source: "dashboard_demo",
         location,
-        confidence: 0.9,
+        confidence: level,
         payload:
           eventType === "crowd_density"
-            ? { density: 0.72 }
-            : { score: 0.72, velocity: 0.72 },
+            ? { density: level }
+            : eventType === "social_concern"
+              ? { velocity: level }
+              : { score: level },
       });
       onCreated?.(created);
       setSent(true);
@@ -77,6 +81,28 @@ export function SignalDialog({ onCreated }: { onCreated?: (event: Event) => void
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="signal-intensity">
+                Intensity
+              </label>
+              <span className="text-xs font-semibold tabular-nums">{intensity}%</span>
+            </div>
+            <input
+              id="signal-intensity"
+              type="range"
+              min={5}
+              max={100}
+              value={intensity}
+              onChange={(event) => setIntensity(Number(event.target.value))}
+              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+              aria-describedby="signal-intensity-hint"
+            />
+            <p id="signal-intensity-hint" className="text-[11px] text-muted-foreground">
+              Drives density / velocity / score and confidence. Higher values raise the
+              deterministic risk contribution.
+            </p>
           </div>
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground" htmlFor="signal-location">

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { requestIncidentAction, submitEvent, updateIncidentStatus } from "../lib/api";
+import { ApiError, requestIncidentAction, submitEvent, updateIncidentStatus } from "../lib/api";
 
 describe("dashboard API writes", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -20,5 +20,18 @@ describe("dashboard API writes", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(1, "http://localhost:8000/incidents/inc-1/status", expect.objectContaining({ method: "POST" }));
     expect(fetchMock).toHaveBeenNthCalledWith(2, "http://localhost:8000/incidents/inc-1/actions", expect.objectContaining({ method: "POST" }));
     expect(JSON.parse(fetchMock.mock.calls[1]![1]!.body)).toEqual({ type: "notify_operator", note: "Approved" });
+  });
+
+  it("surfaces backend status and detail on failures", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail: "Incident must be RESPONDING before requesting an action" }), { status: 409 }),
+      ),
+    );
+    const failure = await requestIncidentAction("inc-1", "notify_operator").catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(ApiError);
+    expect((failure as ApiError).status).toBe(409);
+    expect((failure as ApiError).message).toContain("RESPONDING");
   });
 });

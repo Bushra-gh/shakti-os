@@ -114,7 +114,7 @@ export default function SourcesPage() {
                 <CardContent className="grid grid-cols-3 gap-3 p-6">
                   <div>
                     <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                      Events (24h window retained)
+                      Events (latest 50 retained)
                     </p>
                     <p className="mt-1 text-2xl font-medium tabular-nums">{g.count}</p>
                   </div>

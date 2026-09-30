@@ -155,12 +155,15 @@ export default function IncidentDetail({
       )}
       {incident && (
         <>
-          <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <header className="mb-5 flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">Incident assessment</p>
               <h1 className="mt-2 text-4xl font-medium capitalize tracking-[-0.05em] sm:text-5xl">{label(incident.type)}</h1>
               <p className="mt-2 text-sm font-medium text-muted-foreground">
                 {label(incident.location)} · detected {formatDateTime(incident.created_at)} · updated {formatDateTime(incident.updated_at)}
+              </p>
+              <p className="mt-1.5 font-mono text-[11px] text-muted-foreground" title="Incident ID">
+                ID {incident.id}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -178,6 +181,24 @@ export default function IncidentDetail({
               </span>
             </div>
           </header>
+
+          <ol aria-label="Operator workflow: observe, understand, decide" className="mb-5 flex flex-wrap items-center gap-2 text-xs font-medium">
+            {["Observe signals", "Understand risk", "Decide & approve"].map((phase, index) => (
+              <li key={phase} className="flex items-center gap-2">
+                {index > 0 && <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />}
+                <span
+                  aria-current={index === 1 ? "step" : undefined}
+                  className={`rounded-full px-3 py-1.5 ${
+                    index === 1
+                      ? "bg-foreground text-background"
+                      : "bg-card text-muted-foreground shadow-sm"
+                  }`}
+                >
+                  {index + 1}. {phase}
+                </span>
+              </li>
+            ))}
+          </ol>
 
           <section className="grid gap-4 lg:grid-cols-[1fr_1.2fr]" aria-label="Risk summary">
             <Card className="rounded-[1.75rem] bg-card py-0 ring-0">

@@ -19,7 +19,6 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   TriangleAlert,
-  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -411,15 +410,7 @@ export function OperatorShell({ children }: { children: ReactNode }) {
         <main className="px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         <footer className="flex items-center justify-between px-4 pb-6 text-[11px] text-muted-foreground sm:px-6 lg:px-8">
           <span>Operators retain control — detection never acts autonomously.</span>
-          <button
-            type="button"
-            onClick={() => setMobileOpen(true)}
-            className="inline-flex items-center gap-1 lg:hidden"
-          >
-            <X className="hidden" aria-hidden />
-            Menu
-          </button>
-          <span className="hidden lg:inline">ShaktiOS · Human-approved response</span>
+          <span className="hidden sm:inline">ShaktiOS · Human-approved response</span>
         </footer>
       </div>
     </div>

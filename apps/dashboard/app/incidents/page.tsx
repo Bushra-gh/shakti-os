@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowUpDown, RefreshCw } from "lucide-react";
+import { ArrowUpDown, ChevronRight, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { SeverityBadge, StatusBadge } from "@/components/dashboard/badges";
 import { SignalDialog } from "@/components/dashboard/signal-dialog";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/dashboard/states";
 import { useShaktiData } from "@/hooks/use-shakti";
+import { useRecentTimelines } from "@/hooks/use-timelines";
 import { formatDateTime, label, riskPercent, SEVERITIES, STATUSES } from "@/lib/format";
 
 type SortKey = "updated" | "risk" | "created";
@@ -25,6 +26,16 @@ export default function IncidentsPage() {
   const [status, setStatus] = useState("all");
   const [location, setLocation] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("updated");
+  const { entries: recentEntries } = useRecentTimelines(incidents, 30);
+
+  const signalCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const entry of recentEntries) {
+      if (entry.type !== "event.correlated") continue;
+      counts.set(entry.incident_id, (counts.get(entry.incident_id) ?? 0) + 1);
+    }
+    return counts;
+  }, [recentEntries]);
 
   const locations = useMemo(
     () => Array.from(new Set(incidents.map((i) => i.location))).sort(),
@@ -138,35 +149,57 @@ export default function IncidentsPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead scope="col">Type</TableHead>
+                    <TableHead scope="col">Incident</TableHead>
                     <TableHead scope="col">Location</TableHead>
+                    <TableHead scope="col" className="text-right">Risk</TableHead>
                     <TableHead scope="col">Severity</TableHead>
                     <TableHead scope="col">Status</TableHead>
-                    <TableHead scope="col" className="text-right">Risk</TableHead>
+                    <TableHead scope="col" className="text-right">Signals</TableHead>
                     <TableHead scope="col" className="text-right">Updated</TableHead>
+                    <TableHead scope="col"><span className="sr-only">Action</span></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.map((item) => (
-                    <TableRow key={item.id}>
+                    <TableRow key={item.id} className="hover:bg-muted/60">
                       <TableCell>
                         <Link
                           href={`/incidents/${item.id}`}
                           className="font-medium capitalize hover:text-info hover:underline"
+                          aria-label={`Open ${label(item.type)} at ${label(item.location)}`}
                         >
                           {label(item.type)}
                         </Link>
                       </TableCell>
-                      <TableCell className="capitalize text-muted-foreground">
+                      <TableCell className="capitalize whitespace-nowrap text-muted-foreground">
                         {label(item.location)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <span className="mr-2 inline-block h-1.5 w-16 overflow-hidden rounded-full bg-muted align-middle" aria-hidden>
+                          <span
+                            className="block h-full rounded-full bg-primary"
+                            style={{ width: `${riskPercent(item.risk)}%` }}
+                          />
+                        </span>
+                        <span className="font-medium tabular-nums">{riskPercent(item.risk)}%</span>
                       </TableCell>
                       <TableCell><SeverityBadge value={item.severity} /></TableCell>
                       <TableCell><StatusBadge value={item.status} /></TableCell>
                       <TableCell className="text-right font-medium tabular-nums">
-                        {riskPercent(item.risk)}%
+                        {signalCounts.get(item.id) ?? "—"}
                       </TableCell>
                       <TableCell className="text-right text-xs whitespace-nowrap text-muted-foreground">
                         {formatDateTime(item.updated_at)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Link
+                          href={`/incidents/${item.id}`}
+                          className="inline-flex items-center gap-0.5 text-xs font-medium text-info hover:underline"
+                          aria-label={`Open incident ${label(item.type)} at ${label(item.location)}`}
+                        >
+                          Open
+                          <ChevronRight className="size-3.5" aria-hidden />
+                        </Link>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -31,25 +31,49 @@ export type TimelineEntry = {
 
 export const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+export class ApiError extends Error {
+  status: number;
+  detail: string;
+
+  constructor(status: number, detail: string, fallback: string) {
+    super(detail ? `${fallback} (${status}): ${detail}` : `${fallback} (${status})`);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+async function throwForStatus(response: Response, fallback: string): Promise<never> {
+  let detail = "";
+  try {
+    const body = (await response.json()) as { detail?: unknown };
+    if (typeof body.detail === "string") detail = body.detail;
+    else if (body.detail !== undefined) detail = JSON.stringify(body.detail);
+  } catch {
+    // Non-JSON error body — fall back to the status message.
+  }
+  throw new ApiError(response.status, detail, fallback);
+}
+
 export function websocketUrl(path: string): string {
   return `${apiUrl.replace(/^http/, "ws")}${path}`;
 }
 
 export async function getIncidents(): Promise<Incident[]> {
   const response = await fetch(`${apiUrl}/incidents?limit=50`);
-  if (!response.ok) throw new Error("Incident request failed");
+  if (!response.ok) await throwForStatus(response, "Incident request failed");
   return response.json();
 }
 
 export async function getEvents(): Promise<Event[]> {
   const response = await fetch(`${apiUrl}/events?limit=50`);
-  if (!response.ok) throw new Error("Event request failed");
+  if (!response.ok) await throwForStatus(response, "Event request failed");
   return response.json();
 }
 
 export async function getTimeline(incidentId: string): Promise<TimelineEntry[]> {
   const response = await fetch(`${apiUrl}/incidents/${incidentId}/timeline?limit=100`);
-  if (!response.ok) throw new Error("Timeline request failed");
+  if (!response.ok) await throwForStatus(response, "Timeline request failed");
   return response.json();
 }
 
@@ -59,7 +83,7 @@ export async function submitEvent(event: Omit<Event, "id" | "timestamp">): Promi
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(event),
   });
-  if (!response.ok) throw new Error("Event submission failed");
+  if (!response.ok) await throwForStatus(response, "Event submission failed");
   return response.json();
 }
 
@@ -69,7 +93,7 @@ export async function updateIncidentStatus(incidentId: string, status: string, n
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status, note }),
   });
-  if (!response.ok) throw new Error("Status update failed");
+  if (!response.ok) await throwForStatus(response, "Status update failed");
   return response.json();
 }
 
@@ -79,6 +103,6 @@ export async function requestIncidentAction(incidentId: string, type: string, no
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ type, note }),
   });
-  if (!response.ok) throw new Error("Action request failed");
+  if (!response.ok) await throwForStatus(response, "Action request failed");
   return response.json();
 }
