@@ -47,3 +47,7 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# Supabase CLI generated state (version checks, temp links, local branches).
+# supabase/config.toml and supabase/migrations/ stay tracked.
+supabase/.temp/
