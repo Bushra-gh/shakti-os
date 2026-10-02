@@ -7,10 +7,23 @@ import type { Incident } from "@/lib/api";
 
 const gateCoordinates: Record<string, [number, number]> = {
   gate_1: [23.3441, 85.3096],
-  gate_2: [23.3580, 85.3350],
-  gate_3: [23.3700, 85.3270],
-  gate_4: [23.3350, 85.3150],
-  gate_9: [23.3500, 85.3200],
+  gate_2: [23.358, 85.335],
+  gate_3: [23.37, 85.327],
+  gate_4: [23.335, 85.315],
+  gate_9: [23.35, 85.32],
+  // Kolkata Durga Puja 2026 pandal locations (dummy seed data).
+  kol_sreebhumi: [22.5989, 88.4029],
+  kol_santosh_mitra: [22.568, 88.3635],
+  kol_college_square: [22.5736, 88.3633],
+  kol_mohammad_ali_park: [22.5826, 88.3613],
+  kol_bagbazar: [22.604, 88.365],
+  kol_kumartuli: [22.5999, 88.3594],
+  kol_suruchi_sangha: [22.5193, 88.333],
+  kol_ekdalia: [22.5235, 88.3656],
+  kol_deshapriya_park: [22.5165, 88.3453],
+  kol_maddox_square: [22.5258, 88.358],
+  kol_chetla_agrani: [22.5035, 88.338],
+  kol_dumdum_park: [22.6115, 88.412],
 };
 
 const severityColor: Record<string, string> = {
@@ -22,7 +35,8 @@ const severityColor: Record<string, string> = {
 
 const label = (value: string) => value.replaceAll("_", " ");
 
-const center: [number, number] = [23.3500, 85.3220];
+const ranchiCenter: [number, number] = [23.35, 85.322];
+const kolkataCenter: [number, number] = [22.5726, 88.3639];
 
 const indiaBounds: [[number, number], [number, number]] = [
   [6.5, 68.0],
@@ -30,6 +44,8 @@ const indiaBounds: [[number, number], [number, number]] = [
 ];
 
 export default function SituationMap({ incidents }: { incidents: Incident[] }) {
+  const hasKolkata = incidents.some((incident) => incident.location.startsWith("kol_"));
+  const center = hasKolkata ? kolkataCenter : ranchiCenter;
   return (
     <div className="relative min-h-[420px] overflow-hidden rounded-[1.4rem]">
       <MapContainer

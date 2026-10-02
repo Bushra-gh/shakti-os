@@ -1,0 +1,226 @@
+[
+  {
+    "moment": "Ashtami evening crush — Sree Bhumi queue spillover onto VIP Road",
+    "type": "crowd_density",
+    "source": "iot_sensor",
+    "location": "kol_sreebhumi",
+    "confidence": 0.93,
+    "payload": {"density": 0.94, "moment": "Maha Ashtami evening, 19 Oct 2026 — peak pandal-hopping hour"}
+  },
+  {
+    "moment": "Sree Bhumi abnormal pushing near barricade entry",
+    "type": "abnormal_movement",
+    "source": "camera_analytics",
+    "location": "kol_sreebhumi",
+    "confidence": 0.88,
+    "payload": {"score": 0.86, "velocity": 0.72, "moment": "Ashtami evening — pushing reported at barricaded entry lane"}
+  },
+  {
+    "moment": "Social surge — #SreebhumiCrowd trending",
+    "type": "social_concern",
+    "source": "civic_shield",
+    "location": "kol_sreebhumi",
+    "confidence": 0.82,
+    "payload": {"velocity": 0.9, "mention_count": 1240, "sentiment": "negative", "headline": "Sree Bhumi queue spills onto VIP Road, police extend barricades", "platform": "x, telegram", "trend_status": "surging"}
+  },
+  {
+    "moment": "Citizen report — family separated in Sree Bhumi crowd",
+    "type": "citizen_report",
+    "source": "public_app",
+    "location": "kol_sreebhumi",
+    "confidence": 0.78,
+    "payload": {"description": "Ashtami night e Sree Bhumi te prochondo bhir — bachha ke niye berote parchi na, entry gate e pushing hoche.", "category": "crowd", "urgency": "high", "language": "bn"}
+  },
+  {
+    "moment": "Santosh Mitra Square Vande Mataram theme bottleneck (2026 theme)",
+    "type": "crowd_density",
+    "source": "iot_sensor",
+    "location": "kol_santosh_mitra",
+    "confidence": 0.91,
+    "payload": {"density": 0.89, "moment": "Saptami night — Vande Mataram 150th anniversary theme draws record footfall"}
+  },
+  {
+    "moment": "Santosh Mitra Square 2-minute AV show causes exit jam",
+    "type": "abnormal_movement",
+    "source": "camera_analytics",
+    "location": "kol_santosh_mitra",
+    "confidence": 0.84,
+    "payload": {"score": 0.78, "velocity": 0.65, "moment": "Inside-show bottleneck slows dispersal, Sealdah-side entry rerouted"}
+  },
+  {
+    "moment": "Social surge — Santosh Mitra Square patriotic buzz + police barricade debate",
+    "type": "social_concern",
+    "source": "civic_shield",
+    "location": "kol_santosh_mitra",
+    "confidence": 0.8,
+    "payload": {"velocity": 0.84, "mention_count": 980, "sentiment": "negative", "headline": "Santosh Mitra Square sees unprecedented Saptami rush; entry routes rerouted", "platform": "x, reddit", "trend_status": "surging"}
+  },
+  {
+    "moment": "Citizen report — elderly struggling at Santosh Mitra Square",
+    "type": "citizen_report",
+    "source": "public_app",
+    "location": "kol_santosh_mitra",
+    "confidence": 0.74,
+    "payload": {"description": "Santosh Mitra Square pandal e light show dekhar por exit e jam — aged parents ke niye atke achi, volunteer help dorkar.", "category": "crowd", "urgency": "high", "language": "bn"}
+  },
+  {
+    "moment": "College Square lakeside reflection crowd — orderly but dense",
+    "type": "crowd_density",
+    "source": "crowd_simulator",
+    "location": "kol_college_square",
+    "confidence": 0.87,
+    "payload": {"density": 0.76, "moment": "Navami late night — lakeside illumination crowd, metro running past midnight"}
+  },
+  {
+    "moment": "Social buzz — College Square reflection photos go viral",
+    "type": "social_concern",
+    "source": "civic_shield",
+    "location": "kol_college_square",
+    "confidence": 0.68,
+    "payload": {"velocity": 0.55, "mention_count": 410, "sentiment": "positive", "headline": "College Square lake mirrors pandal lights as crowds linger past midnight", "platform": "x", "trend_status": "rising"}
+  },
+  {
+    "moment": "Mohammad Ali Park democratic rush — central location surge",
+    "type": "crowd_density",
+    "source": "iot_sensor",
+    "location": "kol_mohammad_ali_park",
+    "confidence": 0.89,
+    "payload": {"density": 0.88, "moment": "Ashtami evening 6-10pm peak — longest queues of the day at central Kolkata pair"}
+  },
+  {
+    "moment": "Citizen report — emergency vehicle blocked near Mohammad Ali Park",
+    "type": "citizen_report",
+    "source": "public_app",
+    "location": "kol_mohammad_ali_park",
+    "confidence": 0.81,
+    "payload": {"description": "Heavy congestion near Mohammad Ali Park, ambulance cannot pass through pedestrian corridor. Need traffic volunteer.", "category": "medical", "urgency": "high", "language": "en"}
+  },
+  {
+    "moment": "Bagbazar heritage puja — Ashtami pushpanjali morning surge (since 1919)",
+    "type": "crowd_density",
+    "source": "iot_sensor",
+    "location": "kol_bagbazar",
+    "confidence": 0.86,
+    "payload": {"density": 0.82, "moment": "Ashtami morning pushpanjali — new clothes, bare feet, flowers in hand"}
+  },
+  {
+    "moment": "Social warmth — Bagbazar classical idol praised",
+    "type": "social_concern",
+    "source": "civic_shield",
+    "location": "kol_bagbazar",
+    "confidence": 0.66,
+    "payload": {"velocity": 0.42, "mention_count": 260, "sentiment": "positive", "headline": "Bagbazar Sarbojanin idol hailed as finest classical Kumartuli work", "platform": "x", "trend_status": "rising"}
+  },
+  {
+    "moment": "Kumartuli idol dispatch — carts to trucks on Rabindra Sarani",
+    "type": "abnormal_movement",
+    "source": "camera_analytics",
+    "location": "kol_kumartuli",
+    "confidence": 0.79,
+    "payload": {"score": 0.62, "velocity": 0.58, "moment": "Mahalaya week — 8-ft lanes full of idol carts, photographers crowding sheds"}
+  },
+  {
+    "moment": "Citizen report — Kumartuli lane blocked by camera crowd",
+    "type": "citizen_report",
+    "source": "public_app",
+    "location": "kol_kumartuli",
+    "confidence": 0.7,
+    "payload": {"description": "Kumartuli Banamali Sarkar Street e camera niye eto bhir je cart berote parche na. Artisan shed e dhukte problem.", "category": "crowd", "urgency": "medium", "language": "bn"}
+  },
+  {
+    "moment": "Suruchi Sangha state folk-art theme queue overflow (New Alipore)",
+    "type": "crowd_density",
+    "source": "iot_sensor",
+    "location": "kol_suruchi_sangha",
+    "confidence": 0.9,
+    "payload": {"density": 0.9, "moment": "Saptami evening — award-winning folk-art theme, food stalls at exit gate packed"}
+  },
+  {
+    "moment": "Social surge — Suruchi Sangha craftsmanship draws city-wide visitors",
+    "type": "social_concern",
+    "source": "civic_shield",
+    "location": "kol_suruchi_sangha",
+    "confidence": 0.77,
+    "payload": {"velocity": 0.71, "mention_count": 530, "sentiment": "positive", "headline": "Suruchi Sangha folk-art pandal pulls evening crowds from across the city", "platform": "x, telegram", "trend_status": "rising"}
+  },
+  {
+    "moment": "Ekdalia Evergreen chandelier hall congestion (Ballygunge)",
+    "type": "crowd_density",
+    "source": "crowd_simulator",
+    "location": "kol_ekdalia",
+    "confidence": 0.88,
+    "payload": {"density": 0.84, "moment": "Navami night — opulent chandelier look, tallest idol draws families"}
+  },
+  {
+    "moment": "Citizen report — child lost near Ekdalia Evergreen",
+    "type": "citizen_report",
+    "source": "public_app",
+    "location": "kol_ekdalia",
+    "confidence": 0.83,
+    "payload": {"description": "Ekdalia Evergreen pandal er bhetore 7 bochorer meye hariye geche, announcement dorkar. Blue frock pore ache.", "category": "missing_person", "urgency": "high", "language": "bn"}
+  },
+  {
+    "moment": "Deshapriya Park barricade crush concern (history of police shutdown)",
+    "type": "abnormal_movement",
+    "source": "camera_analytics",
+    "location": "kol_deshapriya_park",
+    "confidence": 0.85,
+    "payload": {"score": 0.8, "velocity": 0.66, "moment": "Ashtami night — crowd density near the year police once shut the pandal down"}
+  },
+  {
+    "moment": "Social concern — Deshapriya Park dispersal warnings",
+    "type": "social_concern",
+    "source": "civic_shield",
+    "location": "kol_deshapriya_park",
+    "confidence": 0.75,
+    "payload": {"velocity": 0.68, "mention_count": 390, "sentiment": "negative", "headline": "Police urge staggered entry at Deshapriya Park as night crowd swells", "platform": "x", "trend_status": "rising"}
+  },
+  {
+    "moment": "Maddox Square adda crowd — late night, high spirits, well-managed",
+    "type": "crowd_density",
+    "source": "crowd_simulator",
+    "location": "kol_maddox_square",
+    "confidence": 0.72,
+    "payload": {"density": 0.58, "moment": "Navami 10pm-1am — the ultimate adda spot, excited and orderly"}
+  },
+  {
+    "moment": "Chetla Agrani ambitious theme — steady evening flow",
+    "type": "crowd_density",
+    "source": "iot_sensor",
+    "location": "kol_chetla_agrani",
+    "confidence": 0.8,
+    "payload": {"density": 0.7, "moment": "Saptami afternoon calm window 1-4pm — serious theme puja, manageable queues"}
+  },
+  {
+    "moment": "Dumdum Park Tarun Sangha colours + folk performance surge",
+    "type": "crowd_density",
+    "source": "iot_sensor",
+    "location": "kol_dumdum_park",
+    "confidence": 0.86,
+    "payload": {"density": 0.83, "moment": "Saptami evening — live folk performance plus pandal colours pack the ground"}
+  },
+  {
+    "moment": "Social buzz — Dumdum Park performance videos spread",
+    "type": "social_concern",
+    "source": "civic_shield",
+    "location": "kol_dumdum_park",
+    "confidence": 0.69,
+    "payload": {"velocity": 0.5, "mention_count": 310, "sentiment": "positive", "headline": "Dumdum Park Tarun Sangha folk night draws Salt Lake families", "platform": "x", "trend_status": "rising"}
+  },
+  {
+    "moment": "Dashami morning — sindoor khela + visarjan procession build-up at Bagbazar ghat",
+    "type": "crowd_density",
+    "source": "iot_sensor",
+    "location": "kol_bagbazar",
+    "confidence": 0.82,
+    "payload": {"density": 0.74, "moment": "Dashami 21 Oct morning — sindoor khela, drums head to Nimtala/Bagbazar ghat"}
+  },
+  {
+    "moment": "Citizen report — Dashami ghat volunteer request",
+    "type": "citizen_report",
+    "source": "public_app",
+    "location": "kol_bagbazar",
+    "confidence": 0.71,
+    "payload": {"description": "Dashami bhashan procession Babughat er dike egoche — ghat e lighting kom, extra volunteer lagbe.", "category": "safety", "urgency": "medium", "language": "bn"}
+  }
+]

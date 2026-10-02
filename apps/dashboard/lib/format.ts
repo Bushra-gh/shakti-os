@@ -75,8 +75,13 @@ export const FACTOR_LABELS: Record<string, string> = {
 
 const SOURCE_META: Record<string, { name: string; kind: string }> = {
   crowd_simulator: { name: "Crowd Simulator", kind: "Physical sensor" },
+  iot_sensor: { name: "IoT Crowd Sensor", kind: "Physical sensor" },
+  camera_analytics: { name: "Camera Analytics", kind: "Physical sensor" },
   civic_shield: { name: "Social Intelligence", kind: "Civic-Shield boundary" },
   citizen_app: { name: "Citizen Report", kind: "Citizen mobile app" },
+  citizen_report: { name: "Citizen Report", kind: "Citizen mobile app" },
+  public_app: { name: "Citizen Report", kind: "Citizen mobile app" },
+  expo_app: { name: "Citizen Report", kind: "Citizen mobile app" },
   dashboard_demo: { name: "Operator Test Signal", kind: "Dashboard" },
 };
 

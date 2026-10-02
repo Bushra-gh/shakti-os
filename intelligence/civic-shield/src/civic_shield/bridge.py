@@ -233,6 +233,8 @@ _SAMPLE_USERS = [
     {"id": "usr_student_eye", "username": "student_eye_witness", "bio": "College Student | Bengaluru"},
     {"id": "usr_safety_first", "username": "safety_first_org", "bio": "Community Safety Volunteer | Gate 4"},
     {"id": "usr_social_feed", "username": "social_feed_bot", "bio": "Automated Social Aggregator | India"},
+    {"id": "usr_puja_hopper", "username": "puja_hopper_kol", "bio": "Pandal hopper | Kolkata, West Bengal"},
+    {"id": "usr_bagbazar_para", "username": "bagbazar_para", "bio": "Para resident | Bagbazar, Kolkata"},
 ]
 
 _SAMPLE_TEXTS_NEGATIVE = [
@@ -243,6 +245,11 @@ _SAMPLE_TEXTS_NEGATIVE = [
     "Gate 4 area completely blocked. No movement possible. Very tense atmosphere. #CrowdControl",
     "Reports of stampede-like situation near Gate 4. Need immediate intervention. #Emergency",
     "Police struggling to maintain order at Gate 4. Crowd density critical. #Breaking",
+    # Kolkata Durga Puja moments (Ashtami/Saptami/Navami 2026 dummy data).
+    "Ashtami night e Sree Bhumi te prochondo bhir — VIP Road obdhi line! #SreebhumiCrowd #DurgaPuja",
+    "Santosh Mitra Square Vande Mataram theme e record footfall, entry rerouted from Sealdah side. #KolkataPuja",
+    "College Square lake er reflection dekhte giye atke gelam — huge crowd but beautiful. #PandalHopping",
+    "Deshapriya Park e barricade crush — police staggered entry korche. #AshtamiCrowd",
 ]
 
 _SAMPLE_TEXTS_NEUTRAL = [
@@ -250,12 +257,14 @@ _SAMPLE_TEXTS_NEUTRAL = [
     "Gate 4 entrance busy but orderly so far. Event starting soon. #LiveUpdates",
     "Crowd building up at Gate 4. Standard event-day congestion. #Gate4",
     "People arriving steadily at Gate 4. Queue management in progress. #EventLogistics",
+    "Saptami afternoon at Chetla Agrani — calm window 1-4pm, manageable queues. #DurgaPuja2026",
 ]
 
 _SAMPLE_TEXTS_POSITIVE = [
     "Great atmosphere at Gate 4! Crowd is excited and well-managed. #EventSuccess",
     "Smooth entry through Gate 4. Excellent crowd management today. #Positive",
     "Everyone in high spirits at Gate 4. Beautiful event vibes! #Community",
+    "Bagbazar Sarbojanin er classical pratima — 1919 er oitijhyo, pushpanjali shesh. Shubho Ashtami! #DurgaPuja",
 ]
 
 _HEADLINES = [
@@ -264,6 +273,7 @@ _HEADLINES = [
     "Gate 4 Area Experiences Heavy Foot Traffic",
     "Event Organizers Monitor Gate 4 Crowd Density",
     "Social Media Reports of Crowding at Gate 4",
+    "Ashtami Evening Crush at Sree Bhumi as Queue Spills onto VIP Road",
 ]
 
 
@@ -362,8 +372,11 @@ def build_social_signal(
     # Trend status
     trend_status = top_trend["status"] if top_trend else "stable"
 
-    # Headline
-    headline = _HEADLINES[0] if _HEADLINES else None
+    # Headline — prefer the Kolkata pandal headline for kol_* locations.
+    if location.startswith("kol_") and len(_HEADLINES) > 1:
+        headline = _HEADLINES[-1]
+    else:
+        headline = _HEADLINES[0] if _HEADLINES else None
 
     # Platform
     platform_set = set(p["platform"] for p in posts)

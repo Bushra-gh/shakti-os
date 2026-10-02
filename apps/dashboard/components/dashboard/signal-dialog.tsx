@@ -9,12 +9,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { submitEvent, type Event } from "@/lib/api";
 import { EVENT_TYPES } from "@/lib/format";
 
+/** Known demo locations (Ranchi gates + Kolkata Durga Puja pandals). Free text still allowed. */
+const LOCATION_SUGGESTIONS = [
+  "gate_1",
+  "gate_2",
+  "gate_3",
+  "gate_4",
+  "gate_9",
+  "kol_sreebhumi",
+  "kol_santosh_mitra",
+  "kol_college_square",
+  "kol_mohammad_ali_park",
+  "kol_bagbazar",
+  "kol_kumartuli",
+  "kol_suruchi_sangha",
+  "kol_ekdalia",
+  "kol_deshapriya_park",
+  "kol_maddox_square",
+  "kol_chetla_agrani",
+  "kol_dumdum_park",
+];
+
 /** Test-signal dialog. Writes through POST /events — never local-only. */
 export function SignalDialog({ onCreated }: { onCreated?: (event: Event) => void }) {
   const [open, setOpen] = useState(false);
   const [eventType, setEventType] = useState<string>("crowd_density");
   const [location, setLocation] = useState("gate_4");
   const [intensity, setIntensity] = useState(72);
+  const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -36,7 +58,13 @@ export function SignalDialog({ onCreated }: { onCreated?: (event: Event) => void
             ? { density: level }
             : eventType === "social_concern"
               ? { velocity: level }
-              : { score: level },
+              : eventType === "citizen_report"
+                ? {
+                    description: note.trim() || "Operator test report",
+                    category: "other",
+                    urgency: "unknown",
+                  }
+                : { score: level },
       });
       onCreated?.(created);
       setSent(true);
@@ -113,8 +141,28 @@ export function SignalDialog({ onCreated }: { onCreated?: (event: Event) => void
               className="h-11 rounded-2xl bg-muted font-medium"
               value={location}
               onChange={(event) => setLocation(event.target.value)}
+              list="signal-location-suggestions"
             />
+            <datalist id="signal-location-suggestions">
+              {LOCATION_SUGGESTIONS.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
           </div>
+          {eventType === "citizen_report" && (
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="signal-note">
+                Report description
+              </label>
+              <Input
+                id="signal-note"
+                className="h-11 rounded-2xl bg-muted font-medium"
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                placeholder="What did the citizen observe?"
+              />
+            </div>
+          )}
           <Button
             className="h-11 w-full rounded-full font-medium"
             disabled={sending || !location.trim()}

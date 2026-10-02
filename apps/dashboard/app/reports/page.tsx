@@ -124,11 +124,13 @@ export default function ReportsPage() {
                   {filtered.map((e) => {
                     const linked = eventToIncident[e.id];
                     const description =
-                      typeof e.payload.text === "string"
-                        ? e.payload.text
-                        : typeof e.payload.summary === "string"
-                          ? e.payload.summary
-                          : Object.entries(e.payload)
+                      typeof e.payload.description === "string"
+                        ? e.payload.description
+                        : typeof e.payload.text === "string"
+                          ? e.payload.text
+                          : typeof e.payload.summary === "string"
+                            ? e.payload.summary
+                            : Object.entries(e.payload)
                               .slice(0, 3)
                               .map(([k, v]) => `${label(k)}: ${String(v)}`)
                               .join(" · ") || "Citizen observation";

@@ -89,7 +89,7 @@ export default function MapPage() {
               ) : (
                 <EmptyState
                   title="No incidents to plot"
-                  hint="Active incidents appear on the deterministic gate map as they are correlated."
+                  hint="Active incidents appear on the Ranchi gate / Kolkata pandal map as they are correlated."
                   className="min-h-[420px]"
                 />
               )}

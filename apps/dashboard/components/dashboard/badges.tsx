@@ -53,8 +53,13 @@ export function StatusBadge({ value, className }: { value: string; className?: s
 
 const sourceIcon: Record<string, typeof Radio> = {
   crowd_simulator: Users,
+  iot_sensor: Users,
+  camera_analytics: Users,
   civic_shield: Radio,
   citizen_app: Smartphone,
+  citizen_report: Smartphone,
+  public_app: Smartphone,
+  expo_app: Smartphone,
 };
 
 function iconForSource(source: string) {
