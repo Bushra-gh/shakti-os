@@ -7,13 +7,15 @@ import { Command, Eye, EyeOff, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { saveAccessToken, supabase, supabaseConfigured } from "@/lib/supabase";
 
 /**
  * Operator sign-in boundary.
  *
- * Production operator auth is NOT implemented on the backend (the API only
- * verifies citizen Supabase JWTs for citizen_report attribution). This screen
- * collects operator identity for the session and documents the gap honestly.
+ * With NEXT_PUBLIC_SUPABASE_URL + publishable key configured, this signs in
+ * through Supabase Auth and stores the session token, which the API verifies
+ * (see services/api auth.py + GET /me). Without those keys it keeps the
+ * previous demo behavior: session identity in localStorage only.
  */
 export default function LoginPage() {
   const router = useRouter();
@@ -23,7 +25,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
@@ -36,10 +38,40 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      localStorage.setItem("shaktios-operator-email", email.trim());
-      localStorage.setItem("shaktios-operator-name", email.trim().split("@")[0] ?? "Operator");
+      if (supabaseConfigured) {
+        const client = supabase();
+        const { data, error: signInError } = await client!.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (signInError || !data.session) {
+          setError(signInError?.message ?? "Sign-in failed. Check your credentials.");
+          setLoading(false);
+          return;
+        }
+        saveAccessToken(data.session.access_token);
+        try {
+          localStorage.setItem("shaktios-operator-email", data.session.user.email ?? email.trim());
+          localStorage.setItem(
+            "shaktios-operator-name",
+            (data.session.user.email ?? email.trim()).split("@")[0] ?? "Operator",
+          );
+        } catch {
+          // Session identity is best-effort.
+        }
+      } else {
+        saveAccessToken(null);
+        try {
+          localStorage.setItem("shaktios-operator-email", email.trim());
+          localStorage.setItem("shaktios-operator-name", email.trim().split("@")[0] ?? "Operator");
+        } catch {
+          // Session identity is best-effort; the dashboard works without it.
+        }
+      }
     } catch {
-      // Session identity is best-effort; the dashboard works without it.
+      setError("Sign-in failed. Is the auth service reachable?");
+      setLoading(false);
+      return;
     }
     setTimeout(() => router.push("/dashboard"), 400);
   };
@@ -129,9 +161,9 @@ export default function LoginPage() {
             <div className="mt-5 flex items-start gap-2 rounded-2xl bg-muted p-3.5 text-xs leading-6 text-muted-foreground">
               <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
               <p>
-                Demo session boundary only — production operator authentication is not yet
-                implemented on the backend. Citizen clients authenticate with Supabase Auth;
-                operator SSO remains a backend/security gap.
+                {supabaseConfigured
+                  ? "Signed in through Supabase Auth — the API verifies this session (GET /me). Citizen clients use the same identity provider."
+                  : "Demo session boundary only — Supabase keys are not configured, so no real authentication happens yet. Citizen clients authenticate with Supabase Auth; operator SSO remains a backend/security gap."}
               </p>
             </div>
             <p className="mt-5 text-center text-xs text-muted-foreground">
