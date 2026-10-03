@@ -64,7 +64,7 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-medium tracking-[-0.03em]">Command Center</h1>
             {!loading && !error && (
               <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide uppercase ${
+                className={`inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-[11px] font-semibold tracking-wide uppercase ${
                   connected ? "bg-success/10 text-success" : "bg-warning/10 text-warning-foreground"
                 }`}
                 role="status"
@@ -86,7 +86,7 @@ export default function DashboardPage() {
       </div>
 
       {error && (
-        <Card className="mb-4 rounded-[1.75rem] bg-card ring-0">
+        <Card className="mb-4 rounded-xl bg-card ring-0">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
             <p className="text-sm font-medium text-destructive">
               API unavailable. Start the ShaktiOS API to connect live operations.
@@ -111,7 +111,7 @@ export default function DashboardPage() {
               { title: "Signals", value: String(events.length).padStart(2, "0"), note: "Latest retained events", icon: Radio },
               { title: "Fusion", value: connected ? "Live" : "Wait", note: "Incident + event streams", icon: Signal },
             ].map(({ title, value, note, icon: Icon }) => (
-              <Card key={title} className="group rounded-[1.75rem] bg-card py-0 ring-0 transition-shadow hover:shadow-sm">
+              <Card key={title} className="group rounded-xl bg-card py-0 ring-0 transition-shadow hover:shadow-sm">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">{title}</p>
@@ -126,9 +126,9 @@ export default function DashboardPage() {
 
       {!loading && !error && topRisk && (
         <section aria-label="Highest risk incident" className="mt-4">
-          <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+          <Card className="rounded-xl bg-card py-0 ring-0">
             <CardContent className="flex flex-wrap items-center gap-5 p-6">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
                 <Flame className="size-5" aria-hidden />
               </span>
               <RiskScore risk={topRisk.risk} severity={topRisk.severity} confidence={topRisk.confidence} compact />
@@ -145,7 +145,7 @@ export default function DashboardPage() {
               </div>
               <Link
                 href={`/incidents/${topRisk.id}`}
-                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
               >
                 Open incident <ArrowUpRight className="size-4" aria-hidden />
               </Link>
@@ -155,7 +155,7 @@ export default function DashboardPage() {
       )}
 
       <section className="mt-4 grid gap-4 xl:grid-cols-[1.4fr_.9fr]">
-        <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+        <Card className="rounded-xl bg-card py-0 ring-0">
           <CardHeader className="px-6 pt-6 pb-0">
             <div className="flex items-center justify-between">
               <div>
@@ -172,7 +172,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+        <Card className="rounded-xl bg-card py-0 ring-0">
           <CardHeader className="px-6 pt-6 pb-0">
             <div className="flex items-center justify-between">
               <div>
@@ -198,7 +198,7 @@ export default function DashboardPage() {
             <ScrollArea className="max-h-[380px]">
               <div className="space-y-1 px-3 pb-3">
                 {active.slice(0, 8).map((item) => (
-                  <Link key={item.id} href={`/incidents/${item.id}`} className="flex items-center justify-between rounded-[1.25rem] px-4 py-4 transition-colors hover:bg-muted">
+                  <Link key={item.id} href={`/incidents/${item.id}`} className="flex items-center justify-between rounded-lg px-4 py-4 transition-colors hover:bg-muted">
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium capitalize">{label(item.type)}</p>
                       <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><MapPinned className="size-3 shrink-0" aria-hidden />{label(item.location)}</p>
@@ -229,7 +229,7 @@ export default function DashboardPage() {
       </section>
 
       <section className="mt-4">
-        <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+        <Card className="rounded-xl bg-card py-0 ring-0">
           <CardHeader className="px-6 pt-6 pb-0">
             <div className="flex items-center justify-between">
               <div>
@@ -248,9 +248,9 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="p-0">
             <Tabs defaultValue="incidents" className="px-6 pt-4 pb-6">
-              <TabsList className="mb-4 rounded-full bg-muted p-1">
-                <TabsTrigger className="rounded-full px-4 font-medium" value="incidents">Incidents</TabsTrigger>
-                <TabsTrigger className="rounded-full px-4 font-medium" value="events">Events</TabsTrigger>
+              <TabsList className="mb-4 rounded-lg bg-muted p-1">
+                <TabsTrigger className="rounded-md px-4 font-medium" value="incidents">Incidents</TabsTrigger>
+                <TabsTrigger className="rounded-md px-4 font-medium" value="events">Events</TabsTrigger>
               </TabsList>
               <TabsContent value="incidents">
                 {loading ? (

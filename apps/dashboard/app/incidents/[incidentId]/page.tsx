@@ -218,7 +218,7 @@ export default function IncidentDetail({
                 {index > 0 && <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />}
                 <span
                   aria-current={index === 1 ? "step" : undefined}
-                  className={`rounded-full px-3 py-1.5 ${
+                  className={`rounded-md px-3 py-1.5 ${
                     index === 1
                       ? "bg-foreground text-background"
                       : "bg-card text-muted-foreground shadow-sm"
@@ -231,7 +231,7 @@ export default function IncidentDetail({
           </ol>
 
           <section className="grid gap-4 lg:grid-cols-[1fr_1.2fr]" aria-label="Risk summary">
-            <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+            <Card className="rounded-xl bg-card py-0 ring-0">
               <CardHeader className="px-6 pt-6 pb-0">
                 <CardTitle className="text-lg font-medium">Risk summary</CardTitle>
               </CardHeader>
@@ -253,7 +253,7 @@ export default function IncidentDetail({
           </section>
 
           <section className="mt-4 grid gap-4 lg:grid-cols-2">
-            <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+            <Card className="rounded-xl bg-card py-0 ring-0">
               <CardHeader className="px-6 pt-6 pb-0">
                 <CardTitle className="text-lg font-medium">Signals / evidence</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -304,7 +304,7 @@ export default function IncidentDetail({
               </CardContent>
             </Card>
 
-            <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+            <Card className="rounded-xl bg-card py-0 ring-0">
               <CardHeader className="px-6 pt-6 pb-0">
                 <CardTitle className="text-lg font-medium">Timeline</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">Chronological audit record</p>
@@ -323,7 +323,7 @@ export default function IncidentDetail({
           </section>
 
           {incident.status !== "RESOLVED" && (
-            <Card className="mt-4 rounded-[1.75rem] bg-card py-0 ring-0">
+            <Card className="mt-4 rounded-xl bg-card py-0 ring-0">
               <CardHeader className="px-6 pt-6 pb-0">
                 <CardTitle className="text-lg font-medium">Operator decision</CardTitle>
               </CardHeader>
@@ -333,7 +333,7 @@ export default function IncidentDetail({
                   are shown; the backend rejects anything else.
                 </p>
                 <Textarea
-                  className="mt-4 min-h-24 rounded-2xl bg-muted"
+                  className="mt-4 min-h-24 rounded-lg bg-muted"
                   placeholder="Optional operator note — stored with the next status change"
                   value={note}
                   onChange={(event) => setNote(event.target.value)}
@@ -347,7 +347,7 @@ export default function IncidentDetail({
                   {allowed.map((status) => (
                     <Button
                       key={status}
-                      className="rounded-full font-medium"
+                      className="rounded-lg font-medium"
                       variant={status === "RESOLVED" ? "outline" : "default"}
                       onClick={() => changeStatus(status)}
                     >
@@ -367,7 +367,7 @@ export default function IncidentDetail({
           )}
 
           {incident.status === "RESPONDING" && (
-            <Card className="mt-4 rounded-[1.75rem] border-warning/30 bg-warning/5 py-0">
+            <Card className="mt-4 rounded-xl border-warning/30 bg-warning/5 py-0">
               <CardHeader className="px-6 pt-6 pb-0">
                 <CardTitle className="flex items-center gap-2 text-lg font-medium">
                   <ShieldAlert className="size-5 text-warning-foreground" aria-hidden />
@@ -384,14 +384,14 @@ export default function IncidentDetail({
                     Requested action
                     <Input
                       id="action-type"
-                      className="h-11 rounded-2xl bg-card"
+                      className="h-11 rounded-lg bg-card"
                       value={actionType}
                       onChange={(event) => setActionType(event.target.value)}
                     />
                   </label>
                   <div className="flex gap-2">
                     <Button
-                      className="rounded-full font-medium"
+                      className="rounded-lg font-medium"
                       disabled={actionState === "sending" || !actionType.trim() || !integrations?.n8n.configured || !integrations.n8n.authenticated}
                       onClick={() => setReviewOpen(true)}
                     >
@@ -412,7 +412,7 @@ export default function IncidentDetail({
           )}
 
           <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
-            <DialogContent className="rounded-[1.75rem] sm:max-w-lg">
+            <DialogContent className="rounded-xl sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle className="text-xl font-medium">Approve action?</DialogTitle>
               </DialogHeader>
@@ -430,7 +430,7 @@ export default function IncidentDetail({
                   </div>
                 ))}
               </dl>
-              <p className="rounded-2xl bg-muted p-3.5 text-xs leading-6 text-muted-foreground">
+              <p className="rounded-lg bg-muted p-3.5 text-xs leading-6 text-muted-foreground">
                 This forwards a human-approved request to the n8n workflow. ShaktiOS never acts
                 autonomously — the timeline records this approval for audit.
               </p>
@@ -440,10 +440,10 @@ export default function IncidentDetail({
                 </p>
               )}
               <div className="flex justify-end gap-2">
-                <Button variant="outline" className="rounded-full" onClick={() => setReviewOpen(false)}>
+                <Button variant="outline" className="rounded-lg" onClick={() => setReviewOpen(false)}>
                   Cancel
                 </Button>
-                <Button className="rounded-full" disabled={actionState === "sending" || !integrations?.n8n.configured || !integrations.n8n.authenticated} onClick={requestAction}>
+                <Button className="rounded-lg" disabled={actionState === "sending" || !integrations?.n8n.configured || !integrations.n8n.authenticated} onClick={requestAction}>
                   {actionState === "sending" ? "Submitting…" : "Approve action"}
                 </Button>
               </div>

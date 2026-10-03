@@ -48,7 +48,7 @@ export function RiskScore({
 /** Deterministic weighted factor breakdown. Never hardcodes values. */
 export function RiskFactors({ factors }: { factors: Record<string, number> }) {
   return (
-    <Card className="rounded-[1.4rem] bg-card py-0 ring-0">
+    <Card className="rounded-xl bg-card py-0 ring-0">
       <CardHeader className="px-5 pt-5 pb-0">
         <CardTitle className="flex items-center gap-2 text-base font-medium">
           Explainable risk

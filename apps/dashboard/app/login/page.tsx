@@ -70,8 +70,8 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10 text-foreground">
       <div className="grid w-full max-w-4xl gap-6 lg:grid-cols-[1fr_1fr]">
-        <div className="hidden flex-col justify-between rounded-[1.75rem] bg-foreground p-8 text-background lg:flex">
-          <span className="flex size-11 items-center justify-center rounded-[1.1rem] bg-background text-foreground">
+        <div className="hidden flex-col justify-between rounded-xl bg-foreground p-8 text-background lg:flex">
+          <span className="flex size-11 items-center justify-center rounded-lg bg-background text-foreground">
             <Command className="size-5" aria-hidden />
           </span>
           <div>
@@ -89,7 +89,7 @@ export default function LoginPage() {
           <p className="text-xs opacity-60">Human-led response · Human-approved action</p>
         </div>
 
-        <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+        <Card className="rounded-xl bg-card py-0 ring-0">
           <CardContent className="p-8">
             <h2 className="text-2xl font-medium tracking-[-0.03em]">Operator login</h2>
             <p className="mt-1 text-sm text-muted-foreground">Access the command center.</p>
@@ -105,7 +105,7 @@ export default function LoginPage() {
                   placeholder="operator@shaktios.gov"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="h-11 rounded-2xl bg-muted"
+                  className="h-11 rounded-lg bg-muted"
                 />
               </div>
               <div className="space-y-2">
@@ -120,7 +120,7 @@ export default function LoginPage() {
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="h-11 rounded-2xl bg-muted pr-11"
+                    className="h-11 rounded-lg bg-muted pr-11"
                   />
                   <button
                     type="button"
@@ -144,12 +144,12 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="h-11 w-full rounded-full font-medium"
+                className="h-11 w-full rounded-lg font-medium"
               >
                 {loading ? "Signing in…" : "Login"}
               </Button>
             </form>
-            <div className="mt-5 flex items-start gap-2 rounded-2xl bg-muted p-3.5 text-xs leading-6 text-muted-foreground">
+            <div className="mt-5 flex items-start gap-2 rounded-lg bg-muted p-3.5 text-xs leading-6 text-muted-foreground">
               <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
               <p>
                 Supabase Auth verifies this session, then GET /me checks the server-side operator allowlist. No demo login or client-only identity is accepted.

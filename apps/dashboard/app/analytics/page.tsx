@@ -155,12 +155,12 @@ export default function AnalyticsPage() {
         </div>
       )}
       {!loading && error && (
-        <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+        <Card className="rounded-xl bg-card py-0 ring-0">
           <ErrorState onRetry={refresh} />
         </Card>
       )}
       {!loading && !error && !hasData && (
-        <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+        <Card className="rounded-xl bg-card py-0 ring-0">
           <EmptyState
             title="No analytics yet"
             hint="Historical metrics appear once events and incidents exist. No sample statistics are shown."
@@ -176,7 +176,7 @@ export default function AnalyticsPage() {
               { title: "Signals (recent)", value: String(events.length), note: "Latest retained events" },
               { title: "Active sources", value: `${activeSources}`, note: "Distinct source identifiers" },
             ].map((kpi) => (
-              <Card key={kpi.title} className="rounded-[1.75rem] bg-card py-0 ring-0">
+              <Card key={kpi.title} className="rounded-xl bg-card py-0 ring-0">
                 <CardContent className="p-6">
                   <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">
                     {kpi.title}
@@ -189,7 +189,7 @@ export default function AnalyticsPage() {
           </section>
 
           <section className="mt-4 grid gap-4 lg:grid-cols-2">
-            <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+            <Card className="rounded-xl bg-card py-0 ring-0">
               <CardHeader className="px-6 pt-6 pb-0">
                 <CardTitle className="text-lg font-medium">Incident trend</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">New incidents per day, last 7 days</p>
@@ -202,7 +202,7 @@ export default function AnalyticsPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+            <Card className="rounded-xl bg-card py-0 ring-0">
               <CardHeader className="px-6 pt-6 pb-0">
                 <CardTitle className="text-lg font-medium">Average risk trend</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">Mean risk score (%) per day, last 7 days</p>
@@ -215,7 +215,7 @@ export default function AnalyticsPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+            <Card className="rounded-xl bg-card py-0 ring-0">
               <CardHeader className="px-6 pt-6 pb-0">
                 <CardTitle className="text-lg font-medium">Severity distribution</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">Current severity across incidents</p>
@@ -232,7 +232,7 @@ export default function AnalyticsPage() {
                 ))}
               </CardContent>
             </Card>
-            <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+            <Card className="rounded-xl bg-card py-0 ring-0">
               <CardHeader className="px-6 pt-6 pb-0">
                 <CardTitle className="text-lg font-medium">Signal source distribution</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">Recent events by source group</p>
@@ -249,7 +249,7 @@ export default function AnalyticsPage() {
                 ))}
               </CardContent>
             </Card>
-            <Card className="rounded-[1.75rem] bg-card py-0 ring-0 lg:col-span-2">
+            <Card className="rounded-xl bg-card py-0 ring-0 lg:col-span-2">
               <CardHeader className="px-6 pt-6 pb-0">
                 <CardTitle className="text-lg font-medium">Top locations</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">Incident count by location</p>

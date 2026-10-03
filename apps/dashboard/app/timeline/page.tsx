@@ -49,7 +49,7 @@ export default function TimelinePage() {
         </div>
         <div className="flex items-center gap-2">
           <Select value={incidentId} onValueChange={(v) => v && setIncidentId(v)}>
-            <SelectTrigger className="h-10 w-56 rounded-full bg-card" aria-label="Filter by incident">
+            <SelectTrigger className="h-10 w-56 rounded-lg bg-card" aria-label="Filter by incident">
               <SelectValue placeholder="All incidents" />
             </SelectTrigger>
             <SelectContent>
@@ -62,7 +62,7 @@ export default function TimelinePage() {
             </SelectContent>
           </Select>
           <Select value={entryType} onValueChange={(v) => v && setEntryType(v)}>
-            <SelectTrigger className="h-10 w-48 rounded-full bg-card" aria-label="Filter by entry type">
+            <SelectTrigger className="h-10 w-48 rounded-lg bg-card" aria-label="Filter by entry type">
               <SelectValue placeholder="All entry types" />
             </SelectTrigger>
             <SelectContent>
@@ -75,7 +75,7 @@ export default function TimelinePage() {
         </div>
       </div>
 
-      <Card className="mx-auto max-w-3xl rounded-[1.75rem] bg-card py-0 ring-0">
+      <Card className="mx-auto max-w-3xl rounded-xl bg-card py-0 ring-0">
         <CardHeader className="px-6 pt-6 pb-0">
           <CardTitle className="text-lg font-medium">
             {incidentId === "all" ? "Recent activity across incidents" : "Incident history"}

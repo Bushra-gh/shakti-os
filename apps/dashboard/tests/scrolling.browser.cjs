@@ -1,12 +1,14 @@
 /*
- * Real-browser scroll regression (run against an already-running dashboard).
+ * Real-browser scroll and corner-radius regression (run against a running dashboard).
  * Uses isolated synthetic sessions/data; never submits an action or contacts
  * the real API/Supabase. Requires an available Playwright installation:
- *   node tests/scrolling.browser.cjs [playwright-module] [chromium-executable] [dashboard-origin]
+ *   node tests/scrolling.browser.cjs [playwright-module] [chromium-executable] [dashboard-origin] [screenshot-dir]
+ * Optional screenshot-dir saves fixture-only screenshots; use a temporary folder.
  */
 /* global __dirname */
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { mkdirSync } = require('node:fs');
 const process = require('node:process');
 const { Buffer } = require('node:buffer');
 const { chromium } = require(process.argv[2] || 'playwright');
@@ -15,6 +17,7 @@ try { process.loadEnvFile(path.resolve(__dirname, '../.env.local')); } catch (er
 }
 
 const dashboardOrigin = process.argv[4] || 'http://localhost:3000';
+const screenshotDirectory = process.argv[5];
 const apiOrigin = new URL(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').origin;
 const authUrl = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://scroll-test.supabase.co');
 const storageKey = `sb-${authUrl.hostname.split('.')[0]}-auth-token`;
@@ -84,6 +87,28 @@ async function main() {
       catch (error) { results.push({ name, ok: false, error: error.message.split('\n')[0] }); }
     };
     const card = (title) => page.locator('[data-slot="card"]').filter({ has: page.getByText(title, { exact: true }) });
+    const radiusCheck = async (locator, max, min = 0) => {
+      await locator.first().waitFor({ state: 'attached' });
+      const radii = await locator.evaluateAll((elements) => elements.map((element) => {
+        const style = getComputedStyle(element);
+        return { element: element.getAttribute('data-slot') || element.tagName, radii: [
+          style.borderTopLeftRadius, style.borderTopRightRadius,
+          style.borderBottomRightRadius, style.borderBottomLeftRadius,
+        ].map(parseFloat) };
+      }));
+      assert(radii.length > 0, 'No matching elements for radius check');
+      for (const item of radii) {
+        assert(item.radii.every((radius) => radius >= min && radius <= max),
+          `${item.element}: expected ${min}–${max}px corners, got ${item.radii.join(', ')}px`);
+      }
+      return { elements: radii.length, maxRadius: Math.max(...radii.flatMap((item) => item.radii)) };
+    };
+    const controls = () => page.locator('[data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]');
+    const screenshot = async (name) => {
+      if (!screenshotDirectory) return;
+      mkdirSync(screenshotDirectory, { recursive: true });
+      await page.screenshot({ path: path.join(screenshotDirectory, `${name}.png`), fullPage: true });
+    };
     const scrollCheck = async (root) => {
       const viewport = root.locator('[data-slot="scroll-area-viewport"]');
       await root.scrollIntoViewIfNeeded();
@@ -110,10 +135,14 @@ async function main() {
 
     await page.goto(`${dashboardOrigin}/incidents/${incidents[0].id}`);
     await card('Signals / evidence').locator('tbody tr').first().waitFor();
+    await check('Incident cards use 12px corners', () => radiusCheck(page.locator('[data-slot="card"]'), 12, 12));
+    await check('Incident inputs and actions are not pills', () => radiusCheck(controls(), 8, 4));
+    await screenshot('incident-desktop');
     await check('Incident evidence table', () => scrollCheck(card('Signals / evidence').locator('[data-slot="scroll-area"]')));
     await check('Fixed-height incident timeline', () => scrollCheck(card('Timeline').locator('[data-slot="scroll-area"]')));
 
     await page.setViewportSize({ width: 390, height: 844 });
+    await screenshot('incident-mobile');
     await check('Narrow-screen evidence table', () => scrollCheck(card('Signals / evidence').locator('[data-slot="scroll-area"]')));
     await check('Evidence table horizontal scrolling', async () => {
       const table = card('Signals / evidence').locator('[data-slot="table-container"]');
@@ -128,9 +157,26 @@ async function main() {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${dashboardOrigin}/dashboard`);
     await card('Incident queue').locator('[data-slot="scroll-area"]').waitFor();
+    await check('Dashboard panels use 12px corners', () => radiusCheck(page.locator('[data-slot="card"]'), 12, 12));
+    await check('Dashboard badges use compact 4px corners', () => radiusCheck(page.locator('[data-slot="badge"]'), 4, 4));
+    await check('Dashboard tabs use 6–8px corners', () => radiusCheck(page.locator('[data-slot="tabs-list"], [data-slot="tabs-trigger"]'), 8, 6));
+    await check('Map frame uses 12px corners', () => radiusCheck(page.getByRole('region', { name: 'Incident situation map' }), 12, 12));
+    await check('Avatars remain circular', async () => {
+      const avatar = page.getByRole('link', { name: 'Operator profile and settings' });
+      const shape = await avatar.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return { width: rect.width, height: rect.height, radius: parseFloat(getComputedStyle(element).borderTopLeftRadius) };
+      });
+      assert.equal(shape.width, shape.height);
+      assert(shape.radius >= shape.width / 2);
+      return shape;
+    });
+    await screenshot('dashboard-desktop');
     await check('Dashboard incident queue', () => scrollCheck(card('Incident queue').locator('[data-slot="scroll-area"]')));
     await page.getByRole('button', { name: 'Search (Ctrl+K)', exact: true }).click();
     await page.getByRole('dialog').locator('[data-slot="scroll-area"] button').first().waitFor();
+    await check('Search dialog uses 12px corners', () => radiusCheck(page.getByRole('dialog'), 12, 12));
+    await screenshot('search-dialog');
     await check('Search result list', () => scrollCheck(page.getByRole('dialog').locator('[data-slot="scroll-area"]')));
     await page.keyboard.press('Escape');
     await page.getByRole('dialog').waitFor({ state: 'hidden' });
@@ -143,6 +189,24 @@ async function main() {
       assert(offset > 0, 'Page remained scroll-locked');
       return { offset };
     });
+    await page.goto(`${dashboardOrigin}/incidents`);
+    await page.getByRole('textbox', { name: 'Search incidents', exact: true }).waitFor();
+    await check('Table filters use 6–8px corners', () => radiusCheck(controls(), 8, 6));
+    await screenshot('incidents-desktop');
+    await page.getByRole('combobox', { name: 'Filter by severity' }).click();
+    await page.getByRole('listbox').waitFor();
+    await check('Filter menu uses 8px corners', () => radiusCheck(page.locator('[data-slot="select-content"]'), 8, 8));
+    await page.keyboard.press('Escape');
+
+    await page.goto(`${dashboardOrigin}/login`);
+    await page.getByLabel('Email address', { exact: true }).waitFor();
+    await check('Login controls use 6–8px corners', () => radiusCheck(controls(), 8, 6));
+    await screenshot('login-desktop');
+    await page.goto(dashboardOrigin);
+    await page.getByText('Event-driven intelligence', { exact: true }).waitFor();
+    await check('Landing panels stay within 16px', () => radiusCheck(page.locator('article, main section > div.rounded-2xl'), 16, 8));
+    await check('Landing action buttons use 8px corners', () => radiusCheck(page.locator('[data-slot="button"]'), 8, 8));
+    await screenshot('landing-desktop');
     assert.equal(mutations, 0, 'Unexpected state-changing API request');
     console.log(JSON.stringify(results, null, 2));
     if (results.some((result) => !result.ok)) process.exitCode = 1;

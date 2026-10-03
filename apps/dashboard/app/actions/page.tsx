@@ -34,7 +34,7 @@ export default function ActionsPage() {
         </p>
       </div>
 
-      <Card className="mb-4 rounded-[1.75rem] border-warning/30 bg-warning/5 py-0">
+      <Card className="mb-4 rounded-xl border-warning/30 bg-warning/5 py-0">
         <CardContent className="flex items-start gap-3 p-5 text-sm">
           <ShieldCheck className="mt-0.5 size-5 shrink-0 text-warning-foreground" aria-hidden />
           <p className="leading-7">
@@ -47,7 +47,7 @@ export default function ActionsPage() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+      <Card className="rounded-xl bg-card py-0 ring-0">
         <CardHeader className="px-5 pt-5 pb-0">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg font-medium">Requested actions</CardTitle>

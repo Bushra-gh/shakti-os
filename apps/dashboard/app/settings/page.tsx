@@ -94,7 +94,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid max-w-4xl gap-4">
-        <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+        <Card className="rounded-xl bg-card py-0 ring-0">
           <CardHeader className="px-6 pt-6 pb-0">
             <CardTitle className="text-lg font-medium">Operator profile</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">Profile data is stored in the current Supabase Auth session.</p>
@@ -102,20 +102,20 @@ export default function SettingsPage() {
           <CardContent className="p-6">
             {loading && <p className="text-sm text-muted-foreground">Loading profile…</p>}
             {!loading && <form className="grid gap-4 sm:grid-cols-2" onSubmit={save}>
-              <div className="space-y-2"><label htmlFor="settings-name" className="text-xs font-medium text-muted-foreground">Display name</label><Input id="settings-name" value={name} onChange={(e) => setName(e.target.value)} className="h-11 rounded-2xl bg-muted" /></div>
-              <div className="space-y-2"><label htmlFor="settings-email" className="text-xs font-medium text-muted-foreground">Email</label><Input id="settings-email" type="email" value={identity?.email ?? ""} readOnly disabled className="h-11 rounded-2xl bg-muted" /></div>
-              <div className="space-y-2"><label htmlFor="settings-role" className="text-xs font-medium text-muted-foreground">Role</label><Input id="settings-role" value={identity?.role ?? ""} readOnly disabled className="h-11 rounded-2xl bg-muted" /></div>
-              <div className="sm:col-span-2"><div className="flex flex-wrap gap-2"><Button type="submit" className="rounded-full font-medium">Save profile</Button><Button type="button" variant="outline" className="rounded-full font-medium" onClick={logout}><LogOut className="size-4" aria-hidden />Log out</Button></div>{saved && <p className="mt-2 flex items-center gap-1.5 text-sm text-success" role="status"><CheckCircle2 className="size-4" aria-hidden />Profile saved in Supabase Auth.</p>}{error && <p className="mt-2 text-sm text-destructive" role="alert">{error}</p>}</div>
+              <div className="space-y-2"><label htmlFor="settings-name" className="text-xs font-medium text-muted-foreground">Display name</label><Input id="settings-name" value={name} onChange={(e) => setName(e.target.value)} className="h-11 rounded-lg bg-muted" /></div>
+              <div className="space-y-2"><label htmlFor="settings-email" className="text-xs font-medium text-muted-foreground">Email</label><Input id="settings-email" type="email" value={identity?.email ?? ""} readOnly disabled className="h-11 rounded-lg bg-muted" /></div>
+              <div className="space-y-2"><label htmlFor="settings-role" className="text-xs font-medium text-muted-foreground">Role</label><Input id="settings-role" value={identity?.role ?? ""} readOnly disabled className="h-11 rounded-lg bg-muted" /></div>
+              <div className="sm:col-span-2"><div className="flex flex-wrap gap-2"><Button type="submit" className="rounded-lg font-medium">Save profile</Button><Button type="button" variant="outline" className="rounded-lg font-medium" onClick={logout}><LogOut className="size-4" aria-hidden />Log out</Button></div>{saved && <p className="mt-2 flex items-center gap-1.5 text-sm text-success" role="status"><CheckCircle2 className="size-4" aria-hidden />Profile saved in Supabase Auth.</p>}{error && <p className="mt-2 text-sm text-destructive" role="alert">{error}</p>}</div>
             </form>}
           </CardContent>
         </Card>
 
-        <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+        <Card className="rounded-xl bg-card py-0 ring-0">
           <CardHeader className="px-6 pt-6 pb-0"><CardTitle className="text-lg font-medium">Timeline notifications</CardTitle></CardHeader>
           <CardContent className="p-6 text-sm leading-7 text-muted-foreground"><p>There are no separate notification preferences. Follow the authenticated realtime streams or open the audit timeline for recorded updates.</p><Link href="/timeline" className="mt-3 inline-flex font-medium text-info hover:underline">Open incident timeline →</Link></CardContent>
         </Card>
 
-        <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+        <Card className="rounded-xl bg-card py-0 ring-0">
           <CardHeader className="px-6 pt-6 pb-0"><CardTitle className="text-lg font-medium">System</CardTitle></CardHeader>
           <CardContent className="p-6"><dl className="grid gap-3 text-sm sm:grid-cols-2">
             {[
@@ -125,7 +125,7 @@ export default function SettingsPage() {
               ["Event stream", eventState.toLowerCase()],
               ["n8n configured", integrations ? String(integrations.n8n.configured) : "Unavailable"],
               ["n8n authenticated", integrations ? String(integrations.n8n.authenticated) : "Unavailable"],
-            ].map(([key, value]) => <div key={key} className="rounded-2xl bg-muted p-3.5"><dt className="text-xs text-muted-foreground">{key}</dt><dd className="mt-0.5 font-medium break-all">{value}</dd></div>)}
+            ].map(([key, value]) => <div key={key} className="rounded-lg bg-muted p-3.5"><dt className="text-xs text-muted-foreground">{key}</dt><dd className="mt-0.5 font-medium break-all">{value}</dd></div>)}
           </dl><Separator className="my-4" /><p className="text-xs leading-6 text-muted-foreground">HTTP and WebSocket status above reflects this authenticated browser session. No client-only demo status is shown.</p></CardContent>
         </Card>
       </div>

@@ -59,7 +59,7 @@ export default function ReportsPage() {
         </div>
         <div className="flex items-center gap-2">
           <Select value={source} onValueChange={(v) => v && setSource(v)}>
-            <SelectTrigger className="h-10 w-44 rounded-full bg-card" aria-label="Filter by source">
+            <SelectTrigger className="h-10 w-44 rounded-lg bg-card" aria-label="Filter by source">
               <SelectValue placeholder="All sources" />
             </SelectTrigger>
             <SelectContent>
@@ -69,14 +69,14 @@ export default function ReportsPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" className="rounded-full" onClick={refresh}>
+          <Button variant="outline" size="sm" className="rounded-lg" onClick={refresh}>
             <RefreshCw className="size-3.5" aria-hidden />
             Refresh
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="rounded-full"
+            className="rounded-lg"
             onClick={exportCsv}
             disabled={filtered.length === 0}
           >
@@ -86,7 +86,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+      <Card className="rounded-xl bg-card py-0 ring-0">
         <CardHeader className="px-5 pt-5 pb-0">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg font-medium">Citizen evidence</CardTitle>

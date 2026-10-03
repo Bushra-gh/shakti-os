@@ -6,6 +6,7 @@ No real citizen accounts, passwords, contacts, photos, or webhook calls are used
 From shakti-os (after `supabase db push`):
     services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --dry-run
     services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --apply
+    services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --venue venue-hackspire26-sonarpur --apply
 
 The default is dry-run. Existing records are skipped, never truncated. The v2
 batch uses deterministic UUIDs and a single transaction so reruns cannot create
@@ -61,14 +62,78 @@ VENUES = [
             ("kol_bagbazar", "Bagbazar", 22.6030, 88.3683),
         ],
     },
+    {
+        "id": "venue-hackspire26-sonarpur",
+        "name": "Hackspire26 — Sonarpur Seed Scenario",
+        "description": "Demo-only scenario inspired by HackSpire'26 at FIEM, Sonarpur. The five zones and coordinates are illustrative, not an official campus layout, event registration, or live safety report.",
+        "venue": "FIEM area, Sonarpur, Greater Kolkata · Demo Site",
+        "location_label": "hackspire26_sonarpur_registration",
+        "status": "active",
+        "helpline": None,
+        "zones": [
+            ("hackspire26_sonarpur_registration", "Hackspire26 · Registration & Entry", 22.4498, 88.4205),
+            ("hackspire26_sonarpur_hacking_arena", "Hackspire26 · Hacking Arena", 22.4506, 88.4220),
+            ("hackspire26_sonarpur_demo_stage", "Hackspire26 · Judging & Demo Stage", 22.4515, 88.4235),
+            ("hackspire26_sonarpur_food_rest", "Hackspire26 · Food & Rest Zone", 22.4507, 88.4188),
+            ("hackspire26_sonarpur_shuttle", "Hackspire26 · Shuttle Arrival", 22.4484, 88.4232),
+        ],
+    },
 ]
+
+# Key profiles by canonical zone ID so filtering/reordering venues cannot
+# accidentally assign another scenario's risk or lifecycle state.
+SCENARIOS = {
+    "techfest_gate_3": (0.95, "DETECTED"),
+    "techfest_food_court": (0.72, "ASSESSING"),
+    "techfest_main_stage": (0.34, "RESOLVED"),
+    "riverfest_gate_4": (0.88, "RESPONDING"),
+    "riverfest_gate_2": (0.51, "ASSESSING"),
+    "riverfest_gate_9": (0.21, "DETECTED"),
+    "kol_sreebhumi": (0.91, "RESPONDING"),
+    "kol_college_square": (0.65, "ASSESSING"),
+    "kol_bagbazar": (0.28, "RESOLVED"),
+    "hackspire26_sonarpur_registration": (0.82, "ASSESSING"),
+    "hackspire26_sonarpur_hacking_arena": (0.59, "DETECTED"),
+    "hackspire26_sonarpur_demo_stage": (0.76, "RESPONDING"),
+    "hackspire26_sonarpur_food_rest": (0.31, "ASSESSING"),
+    "hackspire26_sonarpur_shuttle": (0.66, "DETECTED"),
+}
+TRANSITIONS = {
+    "DETECTED": [], "ASSESSING": ["ASSESSING"],
+    "RESPONDING": ["ASSESSING", "RESPONDING"],
+    "RESOLVED": ["ASSESSING", "RESOLVED"],
+}
+HACKSPIRE_DETAILS = {
+    "hackspire26_sonarpur_registration": "arrival queue at the registration and badge-check desks",
+    "hackspire26_sonarpur_hacking_arena": "pedestrian congestion near the team workspace entrance",
+    "hackspire26_sonarpur_demo_stage": "waiting teams near the judging and project-demo area",
+    "hackspire26_sonarpur_food_rest": "a small refreshment queue beside the rest area",
+    "hackspire26_sonarpur_shuttle": "participants waiting at the Sonarpur shuttle arrival point",
+}
+
+
+def selected_venues(venue_id: str | None = None) -> list[dict]:
+    fixtures = [fixture for fixture in VENUES if venue_id is None or fixture["id"] == venue_id]
+    if not fixtures:
+        raise ValueError("Unknown seed venue")
+    return fixtures
+
+
+def seed_plan(venue_id: str | None = None) -> dict[str, int]:
+    fixtures = selected_venues(venue_id)
+    zones = [zone for fixture in fixtures for zone in fixture["zones"]]
+    return {
+        "venues": len(fixtures), "zones": len(zones), "incidents": len(zones),
+        "events": len(zones) * 7,
+        "timeline": sum(7 + len(TRANSITIONS[SCENARIOS[zone[0]][1]]) for zone in zones),
+    }
 
 
 def stable_id(key: str) -> str:
     return str(uuid5(NAMESPACE_URL, f"{BATCH}/{key}"))
 
 
-def seed(db, now: datetime | None = None) -> dict[str, int]:
+def seed(db, now: datetime | None = None, venue_id: str | None = None) -> dict[str, int]:
     from shaktios_api.event_store import EventRecord
     from shaktios_api.incident_store import IncidentRecord
     from shaktios_api.models import Event
@@ -78,10 +143,8 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
 
     now = now or datetime.now(timezone.utc).replace(microsecond=0)
     counts = {"venues": 0, "zones": 0, "incidents": 0, "events": 0, "timeline": 0}
-    levels = [0.95, 0.72, 0.34, 0.88, 0.51, 0.21, 0.91, 0.65, 0.28]
-    states = ["DETECTED", "ASSESSING", "RESOLVED", "RESPONDING", "ASSESSING", "DETECTED", "RESPONDING", "ASSESSING", "RESOLVED"]
     zone_index = 0
-    for fixture in VENUES:
+    for fixture in selected_venues(venue_id):
         venue = db.get(VenueRecord, fixture["id"])
         if venue is None:
             venue = VenueRecord(**{k: v for k, v in fixture.items() if k != "zones"})
@@ -93,7 +156,7 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
                 db.add(VenueZoneRecord(id=zone_id, venue_id=venue.id, label=label, latitude=latitude, longitude=longitude))
                 counts["zones"] += 1
             incident_id = stable_id(zone_id)
-            level, final_status = levels[zone_index], states[zone_index]
+            level, final_status = SCENARIOS[zone_id]
             zone_index += 1
             if db.get(IncidentRecord, incident_id) is not None:
                 continue
@@ -114,6 +177,11 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
                 ("abnormal_movement", "seed_movement_sensor", {"score": level, "description": f"Seed scenario: movement slows near {label}."}),
                 *[("citizen_report", "seed_citizen_report", {"category": "crowd", "urgency": "normal", "description": f"Seed observation {n + 1}: pedestrian queue near {label}."}) for n in range(4)],
             ]
+            if zone_id in HACKSPIRE_DETAILS:
+                observations = [
+                    (event_type, source, {**payload, "description": f"Hackspire26 seed observation {index + 1}: {HACKSPIRE_DETAILS[zone_id]}. Illustrative data only."})
+                    for index, (event_type, source, payload) in enumerate(observations)
+                ]
             for index, (event_type, source, payload) in enumerate(observations):
                 timestamp = start + timedelta(seconds=20 * index)
                 event = Event(
@@ -134,11 +202,7 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
                 ))
                 counts["events"] += 1
                 counts["timeline"] += 1
-            transitions = {
-                "DETECTED": [], "ASSESSING": ["ASSESSING"],
-                "RESPONDING": ["ASSESSING", "RESPONDING"],
-                "RESOLVED": ["ASSESSING", "RESOLVED"],
-            }[final_status]
+            transitions = TRANSITIONS[final_status]
             for index, state in enumerate(transitions):
                 timestamp = start + timedelta(minutes=3, seconds=20 * index)
                 db.add(TimelineEntryRecord(
@@ -159,9 +223,11 @@ def main() -> None:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--apply", action="store_true", help="Insert missing records into DATABASE_URL")
     mode.add_argument("--dry-run", action="store_true", help="Show the plan without a DB connection")
+    parser.add_argument("--venue", choices=[fixture["id"] for fixture in VENUES], help="Seed only this venue (default: all scenarios)")
     args = parser.parse_args()
     if not args.apply:
-        print("Plan: 3 seed-labelled venue scenarios, 9 zones, 9 incidents, 63 events, and lifecycle timelines.")
+        planned = seed_plan(args.venue)
+        print("Plan (before skipping existing IDs): " + ", ".join(f"{value} {key}" for key, value in planned.items()))
         print("Existing deterministic IDs are skipped. No Auth users, private reports, contacts, or webhook calls.")
         return
     from shaktios_api.database import SessionLocal, engine
@@ -169,7 +235,7 @@ def main() -> None:
         raise SystemExit("Use the configured Supabase PostgreSQL DATABASE_URL to apply this seed.")
     try:
         with SessionLocal.begin() as db:
-            counts = seed(db)
+            counts = seed(db, venue_id=args.venue)
         print("Seed committed: " + ", ".join(f"{value} new {key}" for key, value in counts.items()))
     except Exception as error:
         # DB exceptions can include credentials/SQL parameters; never echo them.

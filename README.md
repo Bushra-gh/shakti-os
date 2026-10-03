@@ -71,7 +71,16 @@ services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --dry-run
 services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --apply
 ```
 
-The default is dry-run. `--apply` inserts 3 labelled seed venues, 9 zones, 9 incidents, 63 events and 74 timeline entries in one transaction. Deterministic IDs are skipped on reruns; existing records are not overwritten. These are **synthetic seed scenarios stored in Supabase**, not live emergency observations. No Auth users, contacts, citizen identities, or n8n calls are created.
+The default is dry-run. A fresh full `--apply` inserts 4 labelled seed venues, 14 zones, 14 incidents, 98 events and 113 timeline entries in one transaction. Deterministic IDs are skipped on reruns; existing records are not overwritten. These are **synthetic seed scenarios stored in Supabase**, not live emergency observations. No Auth users, contacts, citizen identities, or n8n calls are created.
+
+To add just the five Hackspire26 demo nodes near Sonarpur (without reapplying other scenarios):
+
+```powershell
+services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --venue venue-hackspire26-sonarpur --dry-run
+services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --venue venue-hackspire26-sonarpur --apply
+```
+
+This targeted seed adds one venue, five active incidents, 35 events and 39 timeline entries. Refresh the dashboard and pan southeast from central Kolkata toward Sonarpur, approximately `22.450, 88.421`; zoom in to distinguish the nearby nodes. The app venue is **Hackspire26 — Sonarpur Seed Scenario**. Coordinates are illustrative, not an official campus plan.
 
 ### Operator access
 

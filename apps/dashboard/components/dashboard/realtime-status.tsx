@@ -28,7 +28,7 @@ export function RealtimeStatus({
         render={
           <div
             className={cn(
-              "flex items-center gap-2 rounded-full bg-card px-3.5 py-2 text-xs font-medium text-muted-foreground shadow-sm",
+              "flex items-center gap-2 rounded-lg bg-card px-3.5 py-2 text-xs font-medium text-muted-foreground shadow-sm",
               compact && "px-3 py-1.5",
             )}
           />

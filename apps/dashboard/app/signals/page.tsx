@@ -57,7 +57,7 @@ export default function SignalsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="rounded-full" onClick={refresh}>
+          <Button variant="outline" size="sm" className="rounded-lg" onClick={refresh}>
             <RefreshCw className="size-3.5" aria-hidden />
             Refresh
           </Button>
@@ -65,7 +65,7 @@ export default function SignalsPage() {
         </div>
       </div>
 
-      <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+      <Card className="rounded-xl bg-card py-0 ring-0">
         <CardHeader className="px-5 pt-5 pb-0">
           <div className="flex flex-wrap items-center gap-2">
             <Input
@@ -73,10 +73,10 @@ export default function SignalsPage() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search events, locations…"
               aria-label="Search events"
-              className="h-10 max-w-xs rounded-full bg-muted"
+              className="h-10 max-w-xs rounded-lg bg-muted"
             />
             <Select value={type} onValueChange={(v) => v && setType(v)}>
-              <SelectTrigger className="h-10 w-44 rounded-full bg-muted" aria-label="Filter by event type">
+              <SelectTrigger className="h-10 w-44 rounded-lg bg-muted" aria-label="Filter by event type">
                 <SelectValue placeholder="All types" />
               </SelectTrigger>
               <SelectContent>
@@ -87,7 +87,7 @@ export default function SignalsPage() {
               </SelectContent>
             </Select>
             <Select value={source} onValueChange={(v) => v && setSource(v)}>
-              <SelectTrigger className="h-10 w-44 rounded-full bg-muted" aria-label="Filter by source">
+              <SelectTrigger className="h-10 w-44 rounded-lg bg-muted" aria-label="Filter by source">
                 <SelectValue placeholder="All sources" />
               </SelectTrigger>
               <SelectContent>
@@ -98,7 +98,7 @@ export default function SignalsPage() {
               </SelectContent>
             </Select>
             <Select value={location} onValueChange={(v) => v && setLocation(v)}>
-              <SelectTrigger className="h-10 w-40 rounded-full bg-muted" aria-label="Filter by location">
+              <SelectTrigger className="h-10 w-40 rounded-lg bg-muted" aria-label="Filter by location">
                 <SelectValue placeholder="All locations" />
               </SelectTrigger>
               <SelectContent>
@@ -182,7 +182,7 @@ export default function SignalsPage() {
       </Card>
 
       <Dialog open={detail !== null} onOpenChange={(v) => !v && setDetail(null)}>
-        <DialogContent className="rounded-[1.75rem] sm:max-w-lg">
+        <DialogContent className="rounded-xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-lg font-medium capitalize">
               {detail ? label(detail.type) : "Signal detail"}
@@ -207,7 +207,7 @@ export default function SignalsPage() {
                 <div>
                   <dt className="text-muted-foreground">Payload</dt>
                   <dd>
-                    <pre className="mt-1.5 overflow-x-auto rounded-2xl bg-muted p-3.5 text-xs leading-6">
+                    <pre className="mt-1.5 overflow-x-auto rounded-lg bg-muted p-3.5 text-xs leading-6">
                       {JSON.stringify(detail.payload, null, 2)}
                     </pre>
                   </dd>

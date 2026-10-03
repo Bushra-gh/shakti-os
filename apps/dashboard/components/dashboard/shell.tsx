@@ -73,7 +73,7 @@ function SidebarBody({
         )}
         aria-label="ShaktiOS command center"
       >
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-[1rem] bg-foreground text-background">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
           <Command className="size-4" aria-hidden />
         </span>
         {!collapsed && (
@@ -98,7 +98,7 @@ function SidebarBody({
                 onClick={onNavigate}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors",
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   active
                     ? "bg-foreground text-background"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -130,7 +130,7 @@ function SidebarBody({
           href="/settings"
           onClick={onNavigate}
           className={cn(
-            "flex items-center gap-3 rounded-2xl px-2 py-2 transition-colors hover:bg-muted",
+            "flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted",
             collapsed && "justify-center px-0",
           )}
         >
@@ -211,7 +211,7 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (v:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="top-[18%] translate-y-0 rounded-[1.4rem] p-0 sm:max-w-lg">
+      <DialogContent className="top-[18%] translate-y-0 rounded-xl p-0 sm:max-w-lg">
         <DialogHeader className="sr-only">
           <DialogTitle>Search incidents and signals</DialogTitle>
         </DialogHeader>
@@ -248,7 +248,7 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (v:
                   <span className="block truncate text-sm font-medium">{r.title}</span>
                   <span className="block truncate text-xs text-muted-foreground">{r.subtitle}</span>
                 </span>
-                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <span className="shrink-0 rounded-sm bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                   {r.kind}
                 </span>
               </button>
@@ -343,7 +343,7 @@ export function OperatorShell({ children }: { children: ReactNode }) {
           type="button"
           onClick={toggleCollapsed}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="absolute -right-3 top-16 flex size-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+          className="absolute -right-3 top-16 flex size-6 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:text-foreground"
         >
           <ChevronLeft className={cn("size-3.5 transition-transform", collapsed && "rotate-180")} aria-hidden />
         </button>
@@ -367,7 +367,7 @@ export function OperatorShell({ children }: { children: ReactNode }) {
             <Button
               variant="ghost"
               size="icon-sm"
-              className="rounded-full lg:hidden"
+              className="rounded-lg lg:hidden"
               onClick={() => setMobileOpen(true)}
               aria-label="Open navigation"
             >
@@ -384,7 +384,7 @@ export function OperatorShell({ children }: { children: ReactNode }) {
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="hidden items-center gap-2 rounded-full bg-card px-4 py-2 text-xs text-muted-foreground shadow-sm transition-colors hover:text-foreground md:flex"
+              className="hidden items-center gap-2 rounded-lg bg-card px-4 py-2 text-xs text-muted-foreground shadow-sm transition-colors hover:text-foreground md:flex"
               aria-label="Search (Ctrl+K)"
             >
               <Search className="size-3.5" aria-hidden />
@@ -396,14 +396,14 @@ export function OperatorShell({ children }: { children: ReactNode }) {
             <Button
               variant="ghost"
               size="icon-sm"
-              className="rounded-full md:hidden"
+              className="rounded-lg md:hidden"
               onClick={() => setSearchOpen(true)}
               aria-label="Search"
             >
               <Search className="size-4" aria-hidden />
             </Button>
             <RealtimeStatus incidentState={incidentState} eventState={eventState} compact />
-            <Link href="/timeline" className="hidden rounded-full p-2 text-muted-foreground hover:bg-muted sm:inline-flex" aria-label="Open activity timeline">
+            <Link href="/timeline" className="hidden rounded-lg p-2 text-muted-foreground hover:bg-muted sm:inline-flex" aria-label="Open activity timeline">
               <Bell className="size-4" aria-hidden />
             </Link>
             <Link

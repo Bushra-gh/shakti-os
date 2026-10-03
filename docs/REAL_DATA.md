@@ -32,15 +32,38 @@ The dashboard operates on a recent snapshot of up to 200 incidents/events; per-i
 
 `scripts/seed_supabase.py` defaults to dry-run without a database connection. Applying requires a PostgreSQL connection and performs one transaction:
 
-- 3 seed scenario venues, 9 canonical zones.
-- 9 isolated incidents across several severities and lifecycle stages.
-- 63 multi-source events and 74 evidence/status timeline entries.
+- 4 seed scenario venues, 14 canonical zones (including five Hackspire26/Sonarpur nodes).
+- 14 isolated incidents across several severities and lifecycle stages.
+- 98 multi-source events and 113 evidence/status timeline entries on a fresh full seed.
 - UUID5 deterministic IDs, `seed_*` sources, payload `seed_batch=shaktios-seed-v2` and `is_seeded=true`.
 - No truncation, overwriting existing IDs, Auth users, fake citizen identity, phone contacts, attachment URLs, or webhook side effects.
 
 Existing deterministic IDs are skipped. Re-running is a no-op, not a timestamp refresh. Scenario coordinates are illustrative. Replace/register actual venues through an appropriate reviewed database workflow before real operations; an admin venue editor is not part of this MVP.
 
-### Verification performed against the configured Supabase project
+### Hackspire26 / Sonarpur addition
+
+The [official HackSpire'26 guide](https://www.hackspire.tech/guide) lists FIEM Campus, Sonarpur as the venue. The following are **illustrative demo nodes near that area**, not the official campus layout or live conditions. No organizer/emergency contact numbers are invented or copied into the seed.
+
+```powershell
+services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --venue venue-hackspire26-sonarpur --dry-run
+services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --venue venue-hackspire26-sonarpur --apply
+```
+
+| Node | Latitude | Longitude | Seeded state | Risk / severity |
+| --- | --- | --- | --- | --- |
+| Registration & Entry | 22.4498 | 88.4205 | ASSESSING | 81.8% / HIGH |
+| Hacking Arena | 22.4506 | 88.4220 | DETECTED | 61.1% / MEDIUM |
+| Judging & Demo Stage | 22.4515 | 88.4235 | RESPONDING | 76.4% / HIGH |
+| Food & Rest Zone | 22.4507 | 88.4188 | ASSESSING | 35.9% / LOW |
+| Shuttle Arrival | 22.4484 | 88.4232 | DETECTED | 67.4% / MEDIUM |
+
+The targeted application committed **1 venue, 5 zones, 5 active incidents, 35 events and 39 timeline entries** to the configured Supabase database. A second application inserted zero records. Readback through PostgreSQL and the running venue/public-overview APIs verified all five incidents and coordinate pairs. The existing v2 ID namespace and previous records were preserved; no webhook was invoked.
+
+Refresh `/dashboard` or `/map` after SQL seeding (it does not emit in-process WebSocket updates). Pan southeast from the central Kolkata default toward **22.450, 88.421**, then zoom in to separate the nearby campus-area nodes. You can also search incidents for `hackspire26`. On mobile, choose **Hackspire26 — Sonarpur Seed Scenario**, or join using `venue-hackspire26-sonarpur`.
+
+Risk/status values above are initial fixtures; operators may change incident state afterward. Seed reruns do not undo those decisions or refresh timestamps. `--venue` scopes both the dry-run plan and the transaction; omitting it selects every scenario.
+
+### Earlier verification performed against the configured Supabase project
 
 - Applied `20260923000000_real_venues_and_coordinates.sql`.
 - Applied the seed and repeated it; the second v2 application inserted zero records.

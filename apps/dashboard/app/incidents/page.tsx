@@ -65,7 +65,7 @@ export default function IncidentsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="rounded-full" onClick={refresh}>
+          <Button variant="outline" size="sm" className="rounded-lg" onClick={refresh}>
             <RefreshCw className="size-3.5" aria-hidden />
             Refresh
           </Button>
@@ -73,7 +73,7 @@ export default function IncidentsPage() {
         </div>
       </div>
 
-      <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+      <Card className="rounded-xl bg-card py-0 ring-0">
         <CardHeader className="px-5 pt-5 pb-0">
           <div className="flex flex-wrap items-center gap-2">
             <Input
@@ -81,10 +81,10 @@ export default function IncidentsPage() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search incidents, locations…"
               aria-label="Search incidents"
-              className="h-10 max-w-xs rounded-full bg-muted"
+              className="h-10 max-w-xs rounded-lg bg-muted"
             />
             <Select value={severity} onValueChange={(v) => v && setSeverity(v)}>
-              <SelectTrigger className="h-10 w-36 rounded-full bg-muted" aria-label="Filter by severity">
+              <SelectTrigger className="h-10 w-36 rounded-lg bg-muted" aria-label="Filter by severity">
                 <SelectValue placeholder="All severities" />
               </SelectTrigger>
               <SelectContent>
@@ -95,7 +95,7 @@ export default function IncidentsPage() {
               </SelectContent>
             </Select>
             <Select value={status} onValueChange={(v) => v && setStatus(v)}>
-              <SelectTrigger className="h-10 w-36 rounded-full bg-muted" aria-label="Filter by status">
+              <SelectTrigger className="h-10 w-36 rounded-lg bg-muted" aria-label="Filter by status">
                 <SelectValue placeholder="All statuses" />
               </SelectTrigger>
               <SelectContent>
@@ -106,7 +106,7 @@ export default function IncidentsPage() {
               </SelectContent>
             </Select>
             <Select value={location} onValueChange={(v) => v && setLocation(v)}>
-              <SelectTrigger className="h-10 w-36 rounded-full bg-muted" aria-label="Filter by location">
+              <SelectTrigger className="h-10 w-36 rounded-lg bg-muted" aria-label="Filter by location">
                 <SelectValue placeholder="All locations" />
               </SelectTrigger>
               <SelectContent>
@@ -119,7 +119,7 @@ export default function IncidentsPage() {
             <Button
               variant="ghost"
               size="sm"
-              className="rounded-full"
+              className="rounded-lg"
               onClick={() =>
                 setSortKey((k) => (k === "updated" ? "risk" : k === "risk" ? "created" : "updated"))
               }

@@ -50,7 +50,7 @@ export default function MapPage() {
         </div>
         <div className="flex items-center gap-2">
           <Select value={severity} onValueChange={(v) => v && setSeverity(v)}>
-            <SelectTrigger className="h-10 w-36 rounded-full bg-card" aria-label="Filter by severity">
+            <SelectTrigger className="h-10 w-36 rounded-lg bg-card" aria-label="Filter by severity">
               <SelectValue placeholder="All severities" />
             </SelectTrigger>
             <SelectContent>
@@ -61,7 +61,7 @@ export default function MapPage() {
             </SelectContent>
           </Select>
           <Select value={status} onValueChange={(v) => v && setStatus(v)}>
-            <SelectTrigger className="h-10 w-36 rounded-full bg-card" aria-label="Filter by status">
+            <SelectTrigger className="h-10 w-36 rounded-lg bg-card" aria-label="Filter by status">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
@@ -76,13 +76,13 @@ export default function MapPage() {
 
       {loading && <CardSkeleton />}
       {!loading && error && (
-        <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+        <Card className="rounded-xl bg-card py-0 ring-0">
           <ErrorState onRetry={refresh} />
         </Card>
       )}
       {!loading && !error && (
         <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
-          <Card className="overflow-hidden rounded-[1.75rem] bg-card py-0 ring-0">
+          <Card className="overflow-hidden rounded-xl bg-card py-0 ring-0">
             <CardContent className="p-0">
               <SituationMap incidents={active} venues={venues} />
             </CardContent>
@@ -105,7 +105,7 @@ export default function MapPage() {
           </Card>
 
           <div className="space-y-4">
-            <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+            <Card className="rounded-xl bg-card py-0 ring-0">
               <CardHeader className="px-5 pt-5 pb-0">
                 <CardTitle className="text-base font-medium">Selected incident</CardTitle>
               </CardHeader>
@@ -132,7 +132,7 @@ export default function MapPage() {
                       </span>
                     </div>
                     <Link href={`/incidents/${selected.id}`}>
-                      <Button className="w-full rounded-full font-medium">Open incident</Button>
+                      <Button className="w-full rounded-lg font-medium">Open incident</Button>
                     </Link>
                   </>
                 ) : (
@@ -143,7 +143,7 @@ export default function MapPage() {
 
             {selected && <RiskFactors factors={selected.factors} />}
 
-            <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+            <Card className="rounded-xl bg-card py-0 ring-0">
               <CardHeader className="px-5 pt-5 pb-0">
                 <CardTitle className="text-base font-medium">
                   Plotted incidents ({filtered.length})
@@ -156,7 +156,7 @@ export default function MapPage() {
                     type="button"
                     onClick={() => setSelectedId(i.id)}
                     aria-pressed={selected?.id === i.id}
-                    className={`flex w-full items-center justify-between gap-2 rounded-2xl px-3 py-2.5 text-left transition-colors hover:bg-muted ${selected?.id === i.id ? "bg-muted" : ""}`}
+                    className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted ${selected?.id === i.id ? "bg-muted" : ""}`}
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium capitalize">

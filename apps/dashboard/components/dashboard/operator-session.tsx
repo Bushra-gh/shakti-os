@@ -76,7 +76,7 @@ export function OperatorGate({ children }: { children: ReactNode }) {
   }, [router, retry]);
 
   if (!identity) {
-    return <main className="flex min-h-screen items-center justify-center bg-background px-6 text-sm text-muted-foreground"><div className="max-w-md rounded-2xl border border-border bg-card p-6 text-center">
+    return <main className="flex min-h-screen items-center justify-center bg-background px-6 text-sm text-muted-foreground"><div className="max-w-md rounded-xl border border-border bg-card p-6 text-center">
       <p role={error ? "alert" : "status"}>{error ?? "Checking operator access…"}</p>
       {error && <div className="mt-4 flex justify-center gap-4"><button type="button" className="font-medium text-primary" onClick={() => setRetry((key) => key + 1)}>Retry access check</button><Link href="/login" className="font-medium text-primary">Operator login</Link></div>}
     </div></main>;

@@ -23,7 +23,7 @@ export function EmptyState({
       )}
       role="status"
     >
-      <span className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+      <span className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
         {icon ?? <Inbox className="size-5" aria-hidden />}
       </span>
       <p className="mt-3 font-medium">{title}</p>
@@ -51,13 +51,13 @@ export function ErrorState({
       )}
       role="alert"
     >
-      <span className="flex size-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+      <span className="flex size-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
         <TriangleAlert className="size-5" aria-hidden />
       </span>
       <p className="mt-3 font-medium">{title}</p>
       <p className="mt-1 max-w-sm text-sm text-muted-foreground">{hint}</p>
       {onRetry && (
-        <Button variant="outline" size="sm" className="mt-4 rounded-full" onClick={onRetry}>
+        <Button variant="outline" size="sm" className="mt-4 rounded-lg" onClick={onRetry}>
           Retry
         </Button>
       )}
@@ -67,11 +67,11 @@ export function ErrorState({
 
 export function CardSkeleton({ className }: { className?: string }) {
   return (
-    <Card className={cn("rounded-[1.4rem] bg-card py-0 ring-0", className)} aria-hidden>
+    <Card className={cn("rounded-xl bg-card py-0 ring-0", className)} aria-hidden>
       <CardContent className="space-y-3 p-6">
-        <div className="h-3 w-1/3 animate-pulse rounded-full bg-muted" />
+        <div className="h-3 w-1/3 animate-pulse rounded-sm bg-muted" />
         <div className="h-8 w-1/2 animate-pulse rounded-xl bg-muted" />
-        <div className="h-3 w-2/3 animate-pulse rounded-full bg-muted" />
+        <div className="h-3 w-2/3 animate-pulse rounded-sm bg-muted" />
       </CardContent>
     </Card>
   );

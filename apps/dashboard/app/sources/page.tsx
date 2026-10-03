@@ -71,12 +71,12 @@ export default function SourcesPage() {
         </div>
       )}
       {!loading && error && (
-        <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+        <Card className="rounded-xl bg-card py-0 ring-0">
           <ErrorState onRetry={refresh} />
         </Card>
       )}
       {!loading && !error && groups.length === 0 && (
-        <Card className="rounded-[1.75rem] bg-card py-0 ring-0">
+        <Card className="rounded-xl bg-card py-0 ring-0">
           <EmptyState
             title="No sources observed yet"
             hint="Sources appear here once their events reach the backend."
@@ -89,11 +89,11 @@ export default function SourcesPage() {
             const Icon = iconFor(g.source);
             const meta = sourceMeta(g.source);
             return (
-              <Card key={g.source} className="rounded-[1.75rem] bg-card py-0 ring-0">
+              <Card key={g.source} className="rounded-xl bg-card py-0 ring-0">
                 <CardHeader className="px-6 pt-6 pb-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-3">
-                      <span className="flex size-10 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                      <span className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                         <Icon className="size-5" aria-hidden />
                       </span>
                       <div>
@@ -130,7 +130,7 @@ export default function SourcesPage() {
                     </p>
                     <p className="mt-1 text-2xl font-medium tabular-nums">{g.linkedIncidents}</p>
                   </div>
-                  <div className="col-span-3 rounded-2xl bg-muted p-3.5 text-xs leading-6">
+                  <div className="col-span-3 rounded-lg bg-muted p-3.5 text-xs leading-6">
                     <p>
                       Latest: <span className="font-medium capitalize">{label(g.latest.type)}</span>{" "}
                       at <span className="font-medium capitalize">{label(g.latest.location)}</span>{" "}
@@ -145,7 +145,7 @@ export default function SourcesPage() {
         </div>
       )}
 
-      <Card className="mt-4 rounded-[1.75rem] bg-card py-0 ring-0">
+      <Card className="mt-4 rounded-xl bg-card py-0 ring-0">
         <CardHeader className="px-6 pt-6 pb-0">
           <CardTitle className="text-lg font-medium">Source boundaries</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -154,7 +154,7 @@ export default function SourcesPage() {
         </CardHeader>
         <CardContent className="grid gap-3 p-6 md:grid-cols-3">
           {BOUNDARY_NOTES.map((n) => (
-            <div key={n.title} className="rounded-2xl bg-muted p-4">
+            <div key={n.title} className="rounded-lg bg-muted p-4">
               <p className="text-sm font-medium">{n.title}</p>
               <p className="mt-1.5 text-xs leading-6 text-muted-foreground">{n.body}</p>
             </div>

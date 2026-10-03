@@ -53,7 +53,7 @@ export default function SituationMap({ incidents, venues = [] }: { incidents: In
     .filter((item): item is { incident: Incident; coordinate: Coordinate } => Boolean(item.coordinate));
 
   return (
-    <div className="relative isolate min-h-[420px] overflow-hidden rounded-[1.4rem]" role="region" aria-label="Incident situation map">
+    <div className="relative isolate min-h-[420px] overflow-hidden rounded-xl" role="region" aria-label="Incident situation map">
       <MapContainer
         center={KOLKATA_CENTER}
         zoom={KOLKATA_ZOOM}
