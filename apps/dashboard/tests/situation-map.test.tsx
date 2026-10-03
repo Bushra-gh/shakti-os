@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Incident, Venue } from "../lib/api";
 
 // jsdom has no SVG renderer. Keep the real map, tiles and controls, while
-// recording marker props to verify that the Kolkata view never relocates data.
+// recording marker props to verify that the regional view never relocates data.
 vi.mock("react-leaflet", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-leaflet")>();
   return { ...actual, CircleMarker: vi.fn(() => null) };
@@ -48,13 +48,39 @@ function renderMap(incidents: Incident[], venues: Venue[] = []) {
 }
 
 function expectKolkata(map: LeafletMap) {
-  expect(map.getCenter().lat).toBeCloseTo(22.5726, 5);
-  expect(map.getCenter().lng).toBeCloseTo(88.3639, 5);
-  expect(map.getZoom()).toBe(12);
+  expect(map.getCenter().lat).toBeCloseTo(22.525, 5);
+  expect(map.getCenter().lng).toBeCloseTo(88.39, 5);
+  expect(map.getZoom()).toBe(11);
 }
 
-describe("Kolkata-focused situation maps", () => {
-  it("starts in Kolkata despite incidents elsewhere and preserves real marker coordinates", () => {
+describe("Kolkata and Sonarpur situation maps", () => {
+  it.each([320, 800])("includes Kolkata and all five Sonarpur zones in a %ipx-wide initial view", (width) => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(width);
+    const { map } = renderMap([]);
+    expectKolkata(map);
+    expect(screen.getByText("Kolkata & Sonarpur")).toBeInTheDocument();
+    const locations: [number, number][] = [
+      [22.5726, 88.3639], // Central Kolkata
+      [22.603, 88.3683], // Bagbazar
+      [22.6026, 88.4011], // Sreebhumi
+      [22.4498, 88.4205], // Sonarpur registration
+      [22.4506, 88.4220], // Hacking arena
+      [22.4515, 88.4235], // Demo stage
+      [22.4507, 88.4188], // Food/rest
+      [22.4484, 88.4232], // Shuttle arrival
+    ];
+    for (const coordinate of locations) {
+      expect(map.getBounds().contains(coordinate)).toBe(true);
+      const point = map.latLngToContainerPoint(coordinate);
+      // Leave room around markers instead of barely clipping them into view.
+      expect(point.x).toBeGreaterThan(24);
+      expect(point.x).toBeLessThan(width - 24);
+      expect(point.y).toBeGreaterThan(24);
+      expect(point.y).toBeLessThan(420 - 24);
+    }
+  });
+
+  it("starts in the Kolkata/Sonarpur region despite incidents elsewhere and preserves real marker coordinates", () => {
     const fitBounds = vi.spyOn(LeafletMap.prototype, "fitBounds");
     const { map, rerender } = renderMap([incident]);
     expectKolkata(map);
@@ -79,9 +105,9 @@ describe("Kolkata-focused situation maps", () => {
     const decrease = screen.getByRole("button", { name: "Zoom out" });
     expect(screen.getAllByRole("button", { name: "Zoom in" })).toHaveLength(1);
     fireEvent.click(increase);
-    expect(map.getZoom()).toBe(13);
-    fireEvent.click(decrease);
     expect(map.getZoom()).toBe(12);
+    fireEvent.click(decrease);
+    expect(map.getZoom()).toBe(11);
     expect(map.scrollWheelZoom.enabled()).toBe(false);
     expect(map.dragging.enabled()).toBe(true);
     expect(map.keyboard.enabled()).toBe(true);
@@ -94,7 +120,7 @@ describe("Kolkata-focused situation maps", () => {
   it.each([
     { incidents: [], message: "No active incidents to plot." },
     { incidents: [{ ...incident, latitude: null, longitude: null }], message: "No incident coordinates available." },
-  ])("keeps a usable Kolkata basemap for $message", ({ incidents, message }) => {
+  ])("keeps a usable Kolkata/Sonarpur basemap for $message", ({ incidents, message }) => {
     const { map } = renderMap(incidents);
     expectKolkata(map);
     expect(screen.getByRole("status")).toHaveTextContent(message);

@@ -59,7 +59,7 @@ services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --venue venue-hac
 
 The targeted application committed **1 venue, 5 zones, 5 active incidents, 35 events and 39 timeline entries** to the configured Supabase database. A second application inserted zero records. Readback through PostgreSQL and the running venue/public-overview APIs verified all five incidents and coordinate pairs. The existing v2 ID namespace and previous records were preserved; no webhook was invoked.
 
-Refresh `/dashboard` or `/map` after SQL seeding (it does not emit in-process WebSocket updates). Pan southeast from the central Kolkata default toward **22.450, 88.421**, then zoom in to separate the nearby campus-area nodes. You can also search incidents for `hackspire26`. On mobile, choose **Hackspire26 — Sonarpur Seed Scenario**, or join using `venue-hackspire26-sonarpur`.
+Refresh `/dashboard` or `/map` after SQL seeding (it does not emit in-process WebSocket updates). The initial map view includes **Kolkata and Sonarpur**, centered at **22.525, 88.39**, zoom **11**. Zoom in near **22.450, 88.421** to separate the nearby campus-area nodes. Incoming data does not reset a manually chosen view. You can also search incidents for `hackspire26`. On mobile, choose **Hackspire26 — Sonarpur Seed Scenario**, or join using `venue-hackspire26-sonarpur`.
 
 Risk/status values above are initial fixtures; operators may change incident state afterward. Seed reruns do not undo those decisions or refresh timestamps. `--venue` scopes both the dry-run plan and the transaction; omitting it selects every scenario.
 

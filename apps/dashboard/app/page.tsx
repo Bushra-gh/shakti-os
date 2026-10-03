@@ -19,6 +19,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ShaktiLogo } from "@/components/shakti-logo";
 
 // Marketing-only fixtures. The landing page never reads operational APIs.
 const previewStats = [
@@ -53,7 +54,7 @@ function DashboardPreview() {
   return (
     <motion.div initial={reduceMotion ? false : { opacity: 0, y: 24, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.8, delay: 0.16, ease: [0.22, 1, 0.36, 1] }} className="relative overflow-hidden rounded-2xl border border-white/80 bg-white p-2 shadow-[0_24px_70px_rgba(100,104,240,.18)]">
       <div className="flex min-h-[430px] overflow-hidden rounded-lg border border-border bg-[#f6f7f9] text-[10px]">
-        <aside className="hidden w-[76px] shrink-0 border-r border-border bg-white px-2 py-3 sm:block"><div className="mx-auto flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground"><ShieldCheck className="size-4" /></div><div className="mt-6 space-y-1">{["Command", "Incidents", "Map", "Signals", "Analytics", "Timeline"].map((item, index) => <div key={item} className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 ${index === 0 ? "bg-[#eeedff] text-primary" : "text-muted-foreground"}`}><span className="text-[7px] font-bold">{item}</span></div>)}</div></aside>
+        <aside className="hidden w-[76px] shrink-0 border-r border-border bg-white px-2 py-3 sm:block"><ShaktiLogo size={32} className="mx-auto" /><div className="mt-6 space-y-1">{["Command", "Incidents", "Map", "Signals", "Analytics", "Timeline"].map((item, index) => <div key={item} className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 ${index === 0 ? "bg-[#eeedff] text-primary" : "text-muted-foreground"}`}><span className="text-[7px] font-bold">{item}</span></div>)}</div></aside>
         <div className="min-w-0 flex-1">
           <div className="flex h-12 items-center justify-between border-b border-border bg-white px-3 sm:px-4">
             <div><p className="text-[11px] font-extrabold">Command center</p><p className="text-[8px] text-muted-foreground">Kolkata · Puja circuit</p></div>
@@ -153,7 +154,7 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
             className="sticky top-3 z-40 flex items-center justify-between rounded-xl border border-white/80 bg-white/80 px-3 py-2.5 shadow-[0_8px_28px_rgba(29,41,61,.08)] backdrop-blur-xl sm:px-4">
-            <Link href="/" className="flex items-center gap-2.5" aria-label="ShaktiOS home"><span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm"><ShieldCheck className="size-5" /></span><span className="hidden sm:block"><span className="block text-sm font-extrabold tracking-[.16em]">SHAKTIOS</span><span className="block text-[9px] font-semibold tracking-[.12em] text-muted-foreground uppercase">Civic intelligence</span></span></Link>
+            <Link href="/" className="flex items-center gap-2.5" aria-label="ShaktiOS home"><ShaktiLogo size={40} className="rounded-lg shadow-sm" /><span className="hidden sm:block"><span className="block text-sm font-extrabold tracking-[.16em]">SHAKTIOS</span><span className="block text-[9px] font-semibold tracking-[.12em] text-muted-foreground uppercase">Civic intelligence</span></span></Link>
             <div className="hidden items-center gap-1 rounded-xl border border-border/70 bg-[#f6f7f9]/80 p-1 md:flex"><motion.a whileHover={{ y: -1 }} href="#how-it-works" className="rounded-lg bg-white px-3 py-2 text-[11px] font-bold text-foreground shadow-sm">How it works</motion.a><motion.a whileHover={{ y: -1 }} href="#signals" className="rounded-lg px-3 py-2 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-white hover:text-foreground">Signals</motion.a><motion.a whileHover={{ y: -1 }} href="#operators" className="rounded-lg px-3 py-2 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-white hover:text-foreground">For operators</motion.a></div>
             <div className="flex items-center gap-2"><Link href="/dashboard"><Button size="sm" className="h-9 rounded-lg px-3.5 shadow-sm">Open dashboard <ArrowUpRight /></Button></Link></div>
           </motion.nav>
@@ -188,7 +189,7 @@ export default function LandingPage() {
 
       <section className="w-full px-4 pb-6 sm:px-6 lg:px-8"><div className="relative w-full overflow-hidden rounded-2xl bg-[#e1e7fd] px-7 py-14 sm:px-12 sm:py-20"><div className="absolute -top-32 right-0 size-80 rounded-full bg-white/60 blur-3xl" /><div className="relative flex flex-col justify-between gap-9 lg:flex-row lg:items-end"><div><p className="text-[10px] font-extrabold tracking-[.18em] text-primary uppercase">Make the next decision clearer</p><h2 className="mt-4 max-w-3xl text-4xl leading-[.95] font-extrabold tracking-[-.07em] sm:text-6xl">A live operating picture for the next decision at every gate, venue, and community.</h2></div><Link href="/dashboard"><Button size="lg" className="h-12 w-fit rounded-lg px-6 shadow-md">Open the dashboard <ArrowUpRight /></Button></Link></div></div></section>
 
-      <footer className="border-t border-border bg-white"><div className="flex w-full flex-col gap-4 px-4 py-6 text-xs sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"><Link href="/" className="flex items-center gap-2.5"><span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"><ShieldCheck className="size-4" /></span><span className="font-extrabold tracking-[.16em]">SHAKTIOS</span></Link><span className="text-muted-foreground">HackSpire 2026 · Human-approved intelligence</span><Link href="/dashboard" className="flex items-center gap-1 font-extrabold text-primary">Command center <ArrowUpRight className="size-3.5" /></Link></div></footer>
+      <footer className="border-t border-border bg-white"><div className="flex w-full flex-col gap-4 px-4 py-6 text-xs sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"><Link href="/" className="flex items-center gap-2.5"><ShaktiLogo size={32} /><span className="font-extrabold tracking-[.16em]">SHAKTIOS</span></Link><span className="text-muted-foreground">HackSpire 2026 · Human-approved intelligence</span><Link href="/dashboard" className="flex items-center gap-1 font-extrabold text-primary">Command center <ArrowUpRight className="size-3.5" /></Link></div></footer>
     </main>
   );
 }

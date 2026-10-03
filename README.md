@@ -80,7 +80,7 @@ services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --venue venue-hac
 services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --venue venue-hackspire26-sonarpur --apply
 ```
 
-This targeted seed adds one venue, five active incidents, 35 events and 39 timeline entries. Refresh the dashboard and pan southeast from central Kolkata toward Sonarpur, approximately `22.450, 88.421`; zoom in to distinguish the nearby nodes. The app venue is **Hackspire26 — Sonarpur Seed Scenario**. Coordinates are illustrative, not an official campus plan.
+This targeted seed adds one venue, five active incidents, 35 events and 39 timeline entries. Refresh the dashboard: the initial regional view includes both Kolkata and Sonarpur. Zoom in near `22.450, 88.421` to distinguish the nearby Sonarpur nodes. The app venue is **Hackspire26 — Sonarpur Seed Scenario**. Coordinates are illustrative, not an official campus plan.
 
 ### Operator access
 

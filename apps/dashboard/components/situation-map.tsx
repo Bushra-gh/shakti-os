@@ -16,10 +16,11 @@ const displayLabel = (value: string) => value.replaceAll("_", " ");
 
 type Coordinate = [number, number];
 
-// Shared default for the dashboard and full map. Marker coordinates stay
-// authoritative; incoming data must not move the camera away from Kolkata.
-const KOLKATA_CENTER: Coordinate = [22.5726, 88.3639];
-const KOLKATA_ZOOM = 12;
+// Fixed regional default includes central/north Kolkata and the Sonarpur
+// demo zones, even in a narrow 320px-wide, 420px-tall map. This is not a
+// marker-derived fit: incoming data must never reset an operator's view.
+const KOLKATA_SONARPUR_CENTER: Coordinate = [22.525, 88.39];
+const REGIONAL_ZOOM = 11;
 
 function validCoordinate(latitude: number | null | undefined, longitude: number | null | undefined): Coordinate | undefined {
   if (
@@ -55,8 +56,8 @@ export default function SituationMap({ incidents, venues = [] }: { incidents: In
   return (
     <div className="relative isolate min-h-[420px] overflow-hidden rounded-xl" role="region" aria-label="Incident situation map">
       <MapContainer
-        center={KOLKATA_CENTER}
-        zoom={KOLKATA_ZOOM}
+        center={KOLKATA_SONARPUR_CENTER}
+        zoom={REGIONAL_ZOOM}
         scrollWheelZoom={false}
         className="h-full min-h-[420px] w-full"
         zoomControl
@@ -103,7 +104,7 @@ export default function SituationMap({ incidents, venues = [] }: { incidents: In
         ))}
       </MapContainer>
       <div className="pointer-events-none absolute top-3 right-3 z-[800] max-w-[70%] rounded-xl border border-border bg-card/95 px-3 py-2 shadow-sm">
-        <p className="text-xs font-medium">Kolkata</p>
+        <p className="text-xs font-medium">Kolkata &amp; Sonarpur</p>
         {plotted.length === 0 && (
           <p className="mt-1 text-[11px] text-muted-foreground" role="status">
             {incidents.length === 0 ? "No active incidents to plot." : "No incident coordinates available."}

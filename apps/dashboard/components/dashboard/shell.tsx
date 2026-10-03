@@ -8,7 +8,6 @@ import {
   BarChart3,
   Bell,
   ChevronLeft,
-  Command,
   FileText,
   History,
   LayoutDashboard,
@@ -21,6 +20,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ShaktiLogo } from "@/components/shakti-logo";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -73,9 +73,7 @@ function SidebarBody({
         )}
         aria-label="ShaktiOS command center"
       >
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
-          <Command className="size-4" aria-hidden />
-        </span>
+        <ShaktiLogo size={36} />
         {!collapsed && (
           <span className="min-w-0">
             <span className="block text-[15px] leading-tight font-medium tracking-tight">

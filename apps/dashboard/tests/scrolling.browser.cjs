@@ -28,7 +28,9 @@ const session = { access_token: jwt, refresh_token: 'isolated-test-refresh', tok
 const incidents = Array.from({ length: 24 }, (_, index) => ({
   id: `scroll-incident-${index}`, type: 'crowd_risk', location: `gate_${index + 1}`,
   status: 'RESPONDING', severity: 'HIGH', confidence: 0.9, risk: 0.75,
-  latitude: null, longitude: null, factors: { crowd_density: 0.8, citizen_report_count: 3 },
+  latitude: index === 0 ? 22.5726 : index === 1 ? 22.4484 : null,
+  longitude: index === 0 ? 88.3639 : index === 1 ? 88.4232 : null,
+  factors: { crowd_density: 0.8, citizen_report_count: 3 },
   created_at: '2026-09-19T12:00:00Z', updated_at: '2026-09-19T12:03:00Z',
 }));
 const events = Array.from({ length: 40 }, (_, index) => ({
@@ -107,6 +109,14 @@ async function main() {
     const screenshot = async (name) => {
       if (!screenshotDirectory) return;
       mkdirSync(screenshotDirectory, { recursive: true });
+      if (name === 'landing-desktop') {
+        // Trigger the real scroll-reveal animations before a full-page capture.
+        for (const section of await page.locator('main > section').all()) {
+          await section.scrollIntoViewIfNeeded();
+          await page.waitForTimeout(600);
+        }
+        await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+      }
       await page.screenshot({ path: path.join(screenshotDirectory, `${name}.png`), fullPage: true });
     };
     const scrollCheck = async (root) => {
@@ -171,7 +181,36 @@ async function main() {
       assert(shape.radius >= shape.width / 2);
       return shape;
     });
+    const regionalMapCheck = async () => {
+      const region = page.getByRole('region', { name: 'Incident situation map' });
+      const markers = region.locator('.leaflet-overlay-pane path.leaflet-interactive');
+      await markers.nth(1).waitFor({ state: 'attached' });
+      assert.equal(await markers.count(), 2, 'Expected Kolkata and Sonarpur fixture markers');
+      // Read all rectangles in one frame; scrolling must not skew comparisons.
+      const geometry = await region.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        return { width: bounds.width, height: bounds.height,
+          markers: [...element.querySelectorAll('.leaflet-overlay-pane path.leaflet-interactive')].map((marker) => {
+            const box = marker.getBoundingClientRect();
+            return { left: box.left - bounds.left, top: box.top - bounds.top,
+              right: box.right - bounds.left, bottom: box.bottom - bounds.top };
+          }) };
+      });
+      for (const marker of geometry.markers) {
+        assert(marker.left >= 16 && marker.top >= 16 &&
+          marker.right <= geometry.width - 16 && marker.bottom <= geometry.height - 16,
+          `Initial view clips a Kolkata or Sonarpur marker: ${JSON.stringify(geometry)}`);
+      }
+      return { plottedMarkers: 2, mapWidth: geometry.width, mapHeight: geometry.height };
+    };
+    await check('Initial desktop map includes Kolkata and Sonarpur', regionalMapCheck);
     await screenshot('dashboard-desktop');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${dashboardOrigin}/dashboard`);
+    await check('Initial narrow-screen map includes Kolkata and Sonarpur', regionalMapCheck);
+    await screenshot('dashboard-mobile');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${dashboardOrigin}/dashboard`);
     await check('Dashboard incident queue', () => scrollCheck(card('Incident queue').locator('[data-slot="scroll-area"]')));
     await page.getByRole('button', { name: 'Search (Ctrl+K)', exact: true }).click();
     await page.getByRole('dialog').locator('[data-slot="scroll-area"] button').first().waitFor();

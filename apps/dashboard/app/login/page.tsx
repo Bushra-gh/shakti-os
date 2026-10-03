@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Command, Eye, EyeOff, TriangleAlert } from "lucide-react";
+import { Eye, EyeOff, TriangleAlert } from "lucide-react";
+import { ShaktiLogo } from "@/components/shakti-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -71,9 +72,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10 text-foreground">
       <div className="grid w-full max-w-4xl gap-6 lg:grid-cols-[1fr_1fr]">
         <div className="hidden flex-col justify-between rounded-xl bg-foreground p-8 text-background lg:flex">
-          <span className="flex size-11 items-center justify-center rounded-lg bg-background text-foreground">
-            <Command className="size-5" aria-hidden />
-          </span>
+          <ShaktiLogo size={44} />
           <div>
             <p className="text-[11px] font-medium tracking-[0.18em] uppercase opacity-70">
               ShaktiOS
