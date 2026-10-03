@@ -45,7 +45,7 @@ export default function MapPage() {
         <div>
           <h1 className="text-2xl font-medium tracking-[-0.03em]">Live Incident Map</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Real-time view of incidents and signal locations.
+            Kolkata-focused view of incidents and signal locations.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -84,15 +84,7 @@ export default function MapPage() {
         <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
           <Card className="overflow-hidden rounded-[1.75rem] bg-card py-0 ring-0">
             <CardContent className="p-0">
-              {active.length > 0 ? (
-                <SituationMap incidents={active.slice(0, 20)} venues={venues} />
-              ) : (
-                <EmptyState
-                  title="No incidents to plot"
-                  hint="Incidents with API or venue-zone coordinates appear here as they are correlated."
-                  className="min-h-[420px]"
-                />
-              )}
+              <SituationMap incidents={active} venues={venues} />
             </CardContent>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border px-6 py-3.5 text-xs text-muted-foreground">
               <span className="font-medium">Legend:</span>

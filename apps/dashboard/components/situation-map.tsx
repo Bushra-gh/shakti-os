@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
-import { MapContainer, CircleMarker, Popup, ScaleControl, TileLayer, useMap } from "react-leaflet";
+import { MapContainer, CircleMarker, Popup, ScaleControl, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Incident, Venue } from "@/lib/api";
 
@@ -16,6 +15,11 @@ const severityColor: Record<string, string> = {
 const displayLabel = (value: string) => value.replaceAll("_", " ");
 
 type Coordinate = [number, number];
+
+// Shared default for the dashboard and full map. Marker coordinates stay
+// authoritative; incoming data must not move the camera away from Kolkata.
+const KOLKATA_CENTER: Coordinate = [22.5726, 88.3639];
+const KOLKATA_ZOOM = 12;
 
 function validCoordinate(latitude: number | null | undefined, longitude: number | null | undefined): Coordinate | undefined {
   if (
@@ -43,47 +47,21 @@ function coordinateFor(incident: Incident, venues: Venue[]): Coordinate | undefi
   return undefined;
 }
 
-function FitToMarkers({ points }: { points: Coordinate[] }) {
-  const map = useMap();
-  const coordinates = JSON.stringify(points);
-  useEffect(() => {
-    const bounds = JSON.parse(coordinates) as Coordinate[];
-    if (bounds.length > 1) map.fitBounds(bounds, { padding: [32, 32], maxZoom: 16 });
-    else if (bounds.length === 1) map.setView(bounds[0]!, 15);
-  }, [map, coordinates]);
-  return null;
-}
-
 export default function SituationMap({ incidents, venues = [] }: { incidents: Incident[]; venues?: Venue[] }) {
   const plotted = incidents
     .map((incident) => ({ incident, coordinate: coordinateFor(incident, venues) }))
     .filter((item): item is { incident: Incident; coordinate: Coordinate } => Boolean(item.coordinate));
 
-  if (plotted.length === 0) {
-    return (
-      <div className="flex min-h-[420px] items-center justify-center rounded-[1.4rem] bg-muted px-6 text-center">
-        <div>
-          <p className="font-medium">No incident coordinates available</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            The map only plots coordinates returned by the API or a configured venue zone.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const center = plotted[0]!.coordinate;
   return (
     <div className="relative isolate min-h-[420px] overflow-hidden rounded-[1.4rem]" role="region" aria-label="Incident situation map">
       <MapContainer
-        center={center}
-        zoom={15}
+        center={KOLKATA_CENTER}
+        zoom={KOLKATA_ZOOM}
         scrollWheelZoom={false}
         className="h-full min-h-[420px] w-full"
         zoomControl
       >
         <ScaleControl position="bottomleft" imperial={false} />
-        <FitToMarkers points={plotted.map(({ coordinate }) => coordinate)} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -124,6 +102,14 @@ export default function SituationMap({ incidents, venues = [] }: { incidents: In
           </CircleMarker>
         ))}
       </MapContainer>
+      <div className="pointer-events-none absolute top-3 right-3 z-[800] max-w-[70%] rounded-xl border border-border bg-card/95 px-3 py-2 shadow-sm">
+        <p className="text-xs font-medium">Kolkata</p>
+        {plotted.length === 0 && (
+          <p className="mt-1 text-[11px] text-muted-foreground" role="status">
+            {incidents.length === 0 ? "No active incidents to plot." : "No incident coordinates available."}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

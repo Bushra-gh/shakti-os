@@ -1,13 +1,14 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { Map as LeafletMap } from "leaflet";
+import { CircleMarker } from "react-leaflet";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Incident } from "../lib/api";
+import type { Incident, Venue } from "../lib/api";
 
-// jsdom has no SVG renderer. Keep the real Leaflet map, tiles and controls;
-// skip only vector markers so these tests exercise actual control behavior.
+// jsdom has no SVG renderer. Keep the real map, tiles and controls, while
+// recording marker props to verify that the Kolkata view never relocates data.
 vi.mock("react-leaflet", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-leaflet")>();
-  return { ...actual, CircleMarker: () => null };
+  return { ...actual, CircleMarker: vi.fn(() => null) };
 });
 
 import SituationMap from "../components/situation-map";
@@ -28,51 +29,87 @@ const incident: Incident = {
 };
 
 beforeEach(() => {
-  // Leaflet's scale and bounds calculations need a non-zero viewport.
   vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
   vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(420);
 });
 
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
   vi.restoreAllMocks();
 });
 
-describe("situation map controls", () => {
-  it("uses the native zoom buttons, metric scale and attribution without swallowing page scrolling", () => {
-    const zoomIn = vi.spyOn(LeafletMap.prototype, "zoomIn");
-    const zoomOut = vi.spyOn(LeafletMap.prototype, "zoomOut");
-    const { container, rerender } = render(<SituationMap incidents={[incident]} />);
+function renderMap(incidents: Incident[], venues: Venue[] = []) {
+  const setView = vi.spyOn(LeafletMap.prototype, "setView");
+  const view = render(<SituationMap incidents={incidents} venues={venues} />);
+  const map = setView.mock.contexts.find((value) => value instanceof LeafletMap);
+  if (!(map instanceof LeafletMap)) throw new Error("Expected a Leaflet map to initialize");
+  return { ...view, map };
+}
 
+function expectKolkata(map: LeafletMap) {
+  expect(map.getCenter().lat).toBeCloseTo(22.5726, 5);
+  expect(map.getCenter().lng).toBeCloseTo(88.3639, 5);
+  expect(map.getZoom()).toBe(12);
+}
+
+describe("Kolkata-focused situation maps", () => {
+  it("starts in Kolkata despite incidents elsewhere and preserves real marker coordinates", () => {
+    const fitBounds = vi.spyOn(LeafletMap.prototype, "fitBounds");
+    const { map, rerender } = renderMap([incident]);
+    expectKolkata(map);
+    expect(vi.mocked(CircleMarker).mock.calls[0]?.[0].center).toEqual([23.3441, 85.3096]);
+
+    rerender(<SituationMap incidents={[incident, { ...incident, id: "delhi", latitude: 28.6139, longitude: 77.209 }]} />);
+    expectKolkata(map);
+    expect(fitBounds).not.toHaveBeenCalled();
+
+    // Neither status nor coordinate updates should reset a manually chosen view.
+    act(() => { map.setView([22.6, 88.4], 13, { animate: false }); });
+    rerender(<SituationMap incidents={[{ ...incident, status: "ASSESSING", latitude: 22.603, longitude: 88.3683 }]} />);
+    expect(map.getZoom()).toBe(13);
+    expect(map.getCenter().lat).toBeCloseTo(22.6, 5);
+    expect(map.getCenter().lng).toBeCloseTo(88.4, 5);
+    expect(fitBounds).not.toHaveBeenCalled();
+  });
+
+  it("keeps native zoom controls, metric scale and attribution while preserving page scrolling", () => {
+    const { map, container } = renderMap([incident]);
     const increase = screen.getByRole("button", { name: "Zoom in" });
     const decrease = screen.getByRole("button", { name: "Zoom out" });
     expect(screen.getAllByRole("button", { name: "Zoom in" })).toHaveLength(1);
     fireEvent.click(increase);
-    expect(zoomIn).toHaveBeenCalledOnce();
-    const map = zoomIn.mock.contexts[0];
-    if (!(map instanceof LeafletMap)) throw new Error("Zoom control did not target a Leaflet map");
-    expect(map.getZoom()).toBe(16);
+    expect(map.getZoom()).toBe(13);
     fireEvent.click(decrease);
-    expect(zoomOut).toHaveBeenCalledOnce();
-    expect(map.getZoom()).toBe(15);
+    expect(map.getZoom()).toBe(12);
     expect(map.scrollWheelZoom.enabled()).toBe(false);
     expect(map.dragging.enabled()).toBe(true);
     expect(map.keyboard.enabled()).toBe(true);
-
     const scales = container.querySelectorAll(".leaflet-control-scale-line");
     expect(scales).toHaveLength(1);
     expect(scales[0]?.textContent).toMatch(/\d+ (m|km)$/);
     expect(screen.getByRole("link", { name: "OpenStreetMap" })).toHaveAttribute("href", "https://www.openstreetmap.org/copyright");
-
-    // A status-only realtime update must not undo the operator's zoom.
-    fireEvent.click(increase);
-    rerender(<SituationMap incidents={[{ ...incident, status: "ASSESSING" }]} />);
-    expect(map.getZoom()).toBe(16);
   });
 
-  it("keeps the no-coordinate state free of unusable controls", () => {
-    render(<SituationMap incidents={[{ ...incident, latitude: null, longitude: null }]} />);
-    expect(screen.getByText("No incident coordinates available")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Zoom in" })).not.toBeInTheDocument();
+  it.each([
+    { incidents: [], message: "No active incidents to plot." },
+    { incidents: [{ ...incident, latitude: null, longitude: null }], message: "No incident coordinates available." },
+  ])("keeps a usable Kolkata basemap for $message", ({ incidents, message }) => {
+    const { map } = renderMap(incidents);
+    expectKolkata(map);
+    expect(screen.getByRole("status")).toHaveTextContent(message);
+    expect(screen.getByRole("button", { name: "Zoom in" })).toBeInTheDocument();
+    expect(CircleMarker).not.toHaveBeenCalled();
+  });
+
+  it("uses registered zone coordinates without moving the initial view", () => {
+    const venues: Venue[] = [{
+      id: "kolkata-test", name: "Kolkata Test Venue", venue: "Kolkata", description: "Test fixture",
+      locationLabel: "Bagbazar", status: "active", startTime: null, endTime: null, helpline: null,
+      zones: [{ id: "kol_bagbazar", label: "Bagbazar", latitude: 22.603, longitude: 88.3683 }],
+    }];
+    const { map } = renderMap([{ ...incident, location: "kol_bagbazar", latitude: null, longitude: null }], venues);
+    expectKolkata(map);
+    expect(vi.mocked(CircleMarker).mock.calls[0]?.[0].center).toEqual([22.603, 88.3683]);
   });
 });

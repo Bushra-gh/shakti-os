@@ -39,7 +39,8 @@ describe("landing page demo data", () => {
     expect(screen.getByText("Demo preview")).toBeInTheDocument();
     expect(screen.getByText("Crowd buildup")).toBeInTheDocument();
     expect(screen.getByText("Operator review started")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /Demo venue map/ })).toBeInTheDocument();
+    expect(screen.getByText("Kolkata · Puja circuit")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Demo venue map of Kolkata/ })).toBeInTheDocument();
     const pulse = within(screen.getByRole("region", { name: "Sample system pulse" }));
     expect(pulse.getByText("Sample data")).toBeInTheDocument();
     for (const value of ["12", "03", "128", "08"]) {

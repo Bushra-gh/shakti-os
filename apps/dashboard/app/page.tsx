@@ -29,16 +29,16 @@ const previewStats = [
 ];
 
 const previewIncidents = [
-  { id: "gate-4", title: "Crowd buildup", location: "Gate 4", status: "Assessing", risk: 87, tone: "bg-[#fff1e3] text-[#e8830c]", x: "28%", y: "32%" },
-  { id: "food-court", title: "Access obstruction", location: "Food Court", status: "Responding", risk: 76, tone: "bg-[#fff1e3] text-[#e8830c]", x: "69%", y: "35%" },
-  { id: "main-stage", title: "Movement anomaly", location: "Main Stage", status: "Detected", risk: 71, tone: "bg-[#fff1e3] text-[#e8830c]", x: "44%", y: "72%" },
-  { id: "east-gate", title: "Queue forming", location: "East Gate", status: "Assessing", risk: 35, tone: "bg-[#e4f5f0] text-[#12a594]", x: "78%", y: "76%" },
+  { id: "sreebhumi", title: "Crowd buildup", location: "Sreebhumi", status: "Assessing", risk: 87, tone: "bg-[#fff1e3] text-[#e8830c]", x: "72%", y: "28%" },
+  { id: "college-square", title: "Access obstruction", location: "College Square", status: "Responding", risk: 76, tone: "bg-[#fff1e3] text-[#e8830c]", x: "40%", y: "52%" },
+  { id: "bagbazar", title: "Movement anomaly", location: "Bagbazar", status: "Detected", risk: 71, tone: "bg-[#fff1e3] text-[#e8830c]", x: "33%", y: "24%" },
+  { id: "ballygunge", title: "Queue forming", location: "Ballygunge", status: "Assessing", risk: 35, tone: "bg-[#e4f5f0] text-[#12a594]", x: "67%", y: "77%" },
 ];
 
 const previewActivity = [
-  { title: "Crowd signals correlated", detail: "Gate 4 · 3 sources", time: "14:32" },
-  { title: "Operator review started", detail: "Food Court · Access", time: "14:30" },
-  { title: "Citizen report received", detail: "East Gate · Queue", time: "14:28" },
+  { title: "Crowd signals correlated", detail: "Sreebhumi · 3 sources", time: "14:32" },
+  { title: "Operator review started", detail: "College Square · Access", time: "14:30" },
+  { title: "Citizen report received", detail: "Ballygunge · Queue", time: "14:28" },
 ];
 
 const sourceCards = [
@@ -56,7 +56,7 @@ function DashboardPreview() {
         <aside className="hidden w-[76px] shrink-0 border-r border-border bg-white px-2 py-3 sm:block"><div className="mx-auto flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground"><ShieldCheck className="size-4" /></div><div className="mt-6 space-y-1">{["Command", "Incidents", "Map", "Signals", "Analytics", "Timeline"].map((item, index) => <div key={item} className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 ${index === 0 ? "bg-[#eeedff] text-primary" : "text-muted-foreground"}`}><span className="text-[7px] font-bold">{item}</span></div>)}</div></aside>
         <div className="min-w-0 flex-1">
           <div className="flex h-12 items-center justify-between border-b border-border bg-white px-3 sm:px-4">
-            <div><p className="text-[11px] font-extrabold">Command center</p><p className="text-[8px] text-muted-foreground">Riverfest · Venue overview</p></div>
+            <div><p className="text-[11px] font-extrabold">Command center</p><p className="text-[8px] text-muted-foreground">Kolkata · Puja circuit</p></div>
             <span className="flex items-center gap-1 rounded-full bg-[#eeedff] px-2 py-1 text-[8px] font-bold text-primary"><span className="size-1.5 rounded-full bg-primary" /> Demo preview</span>
           </div>
           <div className="space-y-2.5 p-2.5 sm:p-3">
@@ -70,8 +70,8 @@ function DashboardPreview() {
             </div>
             <div className="grid gap-2.5 lg:grid-cols-[1.25fr_.75fr]">
               <div className="rounded-xl border border-border bg-white p-2.5">
-                <div className="mb-2 flex items-center justify-between"><div><p className="text-[10px] font-extrabold">Situation map</p><p className="text-[8px] text-muted-foreground">4 zones · Illustrative venue layout</p></div><MapPin className="size-3 text-primary" /></div>
-                <div className="relative h-[196px] overflow-hidden rounded-lg bg-[#e8ecf4]" role="img" aria-label="Demo venue map with sample incidents at Gate 4, Food Court, Main Stage and East Gate">
+                <div className="mb-2 flex items-center justify-between"><div><p className="text-[10px] font-extrabold">Situation map</p><p className="text-[8px] text-muted-foreground">4 zones · Illustrative Kolkata layout</p></div><MapPin className="size-3 text-primary" /></div>
+                <div className="relative h-[196px] overflow-hidden rounded-lg bg-[#e8ecf4]" role="img" aria-label="Demo venue map of Kolkata with sample incidents at Sreebhumi, College Square, Bagbazar and Ballygunge">
                   <div className="absolute inset-0 opacity-60" style={{ backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
                   <div className="absolute -top-6 left-[52%] h-[140%] w-9 rotate-[24deg] border-x-4 border-white/60 bg-[#cadcf7]" />
                   <div className="absolute top-[49%] -left-4 h-3 w-[120%] -rotate-12 bg-white/90" />

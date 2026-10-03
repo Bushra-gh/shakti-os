@@ -55,7 +55,6 @@ export default function DashboardPage() {
   const averageRisk = active.length
     ? active.reduce((sum, item) => sum + item.risk, 0) / active.length
     : 0;
-  const plotted = useMemo(() => active.slice(0, 8), [active]);
 
   return (
     <OperatorShell>
@@ -161,7 +160,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg font-medium tracking-[-0.03em]">Live situation map</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">Coordinates from live incidents and venue zones</p>
+                <p className="mt-1 text-sm text-muted-foreground">Kolkata view · Coordinates from live incidents and venue zones</p>
               </div>
               <Link href="/map" className="inline-flex items-center gap-1 text-xs font-medium text-info hover:underline">
                 Full map <ArrowUpRight className="size-3" aria-hidden />
@@ -169,13 +168,7 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-0 pt-4">
-            {plotted.length > 0 ? (
-              <SituationMap incidents={plotted} venues={venues} />
-            ) : (
-              <div className="flex min-h-[420px] items-center justify-center rounded-[1.4rem] bg-muted">
-                <p className="text-sm text-muted-foreground">No active incidents to plot.</p>
-              </div>
-            )}
+            <SituationMap incidents={active} venues={venues} />
           </CardContent>
         </Card>
 
