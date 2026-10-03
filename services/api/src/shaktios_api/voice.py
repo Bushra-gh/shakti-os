@@ -1,10 +1,10 @@
 """Authenticated, ephemeral voice drafts; deliberately no event/action write imports."""
 
 import asyncio
-import time
 from collections import deque
 from contextlib import asynccontextmanager, contextmanager
 from threading import Lock
+from time import monotonic
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from python_multipart.exceptions import MultipartParseError
@@ -59,7 +59,7 @@ class VoiceLimiter:
 
     @contextmanager
     def lease(self, user_id: str):
-        now = time.monotonic()
+        now = monotonic()
         with self._lock:
             for identity in list(self._starts):
                 starts = self._starts[identity]

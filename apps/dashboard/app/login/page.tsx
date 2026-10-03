@@ -90,6 +90,10 @@ export default function LoginPage() {
 
         <Card className="rounded-xl bg-card py-0 ring-0">
           <CardContent className="p-8">
+            <div className="mb-5 flex items-center gap-2.5 lg:hidden">
+              <ShaktiLogo size={36} />
+              <span className="text-[15px] font-medium tracking-tight">ShaktiOS</span>
+            </div>
             <h2 className="text-2xl font-medium tracking-[-0.03em]">Operator login</h2>
             <p className="mt-1 text-sm text-muted-foreground">Access the command center.</p>
             <form className="mt-6 space-y-4" onSubmit={submit} noValidate>

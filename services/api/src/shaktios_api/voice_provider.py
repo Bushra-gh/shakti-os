@@ -20,6 +20,7 @@ CATEGORIES = ("crowd", "medical", "lost_person", "fire_smoke", "suspicious", "vi
 URGENCIES = ("low", "medium", "high")
 MAX_PROVIDER_BYTES = 128 * 1024
 MAX_TRANSCRIPT_CHARS = 8000
+PROVIDER_TIMEOUT_SECONDS = 35
 STT_URL = "https://api.sarvam.ai/speech-to-text"
 CHAT_URL = "https://api.sarvam.ai/v1/chat/completions"
 EXTRACTION_WARNING = "Automatic field extraction is unavailable. Your transcript is preserved; complete the report manually."
@@ -76,7 +77,7 @@ def _decode_json(raw: str | bytes) -> object:
 
 async def _provider_json(client: httpx.AsyncClient, url: str, **kwargs) -> dict:
     try:
-        async with asyncio.timeout(35):
+        async with asyncio.timeout(PROVIDER_TIMEOUT_SECONDS):
             return await _read_provider_json(client, url, **kwargs)
     except TimeoutError:
         raise ProviderError(504, "Voice processing timed out. Try later or enter the report manually.") from None
@@ -163,6 +164,11 @@ def _validated_fields(raw: object, transcript: str, venue: Venue, warnings: list
             warnings.append(f"{label} was missing, uncertain or invalid. Select it manually.")
         values[field] = value
     description = raw.get("description")
+    if isinstance(description, str):
+        try:
+            description.encode("utf-8")
+        except UnicodeError:
+            description = None
     if not isinstance(description, str) or not description.strip() or len(description) > 500:
         description = transcript[:500]
         warnings.append("Description could not be extracted safely. Review the transcript and edit the description.")
@@ -190,6 +196,10 @@ async def create_draft(audio: UploadFile, filename: str, venue: Venue, language_
         transcript = stt.get("transcript")
         if not isinstance(transcript, str) or len(transcript) > MAX_TRANSCRIPT_CHARS:
             raise ProviderError(502, "Voice provider returned an invalid transcript. Enter the report manually.")
+        try:
+            transcript.encode("utf-8")
+        except UnicodeError:
+            raise ProviderError(502, "Voice provider returned an invalid transcript. Enter the report manually.") from None
         transcript = transcript.strip()
         if not transcript:
             raise ProviderError(422, "No speech was detected. Record a clear clip or enter the report manually.")

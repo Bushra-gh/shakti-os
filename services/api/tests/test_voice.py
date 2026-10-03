@@ -39,7 +39,8 @@ def chat(fields=None, **extra):
 
 
 @pytest.fixture(autouse=True)
-def safe_environment(monkeypatch):
+def safe_environment(monkeypatch, caplog):
+    caplog.set_level("DEBUG")  # Privacy assertions include info/debug logs, not just warnings.
     monkeypatch.setenv("SARVAM_API_KEY", SECRET)
     monkeypatch.delenv("SARVAM_STT_MODEL", raising=False)
     monkeypatch.delenv("SARVAM_CHAT_MODEL", raising=False)
@@ -286,6 +287,14 @@ def test_oversized_declared_length_rejected_before_stream(client, provider, monk
     assert provider[0] == []
 
 
+def test_smaller_content_length_does_not_bypass_actual_byte_limit(client, provider):
+    response = client.post("/voice/draft", content=b"x" * (voice.MAX_REQUEST_BYTES + 1), headers={
+        **HEADERS, "Content-Type": "multipart/form-data; boundary=x", "Content-Length": "1",
+    })
+    assert response.status_code == 413
+    assert provider[0] == []
+
+
 def test_chunked_request_without_content_length_is_bounded(client, provider, temporary_files):
     prefix = b'--x\r\nContent-Disposition: form-data; name="audio"; filename="a.m4a"\r\nContent-Type: audio/mp4\r\n\r\n'
     def chunks():
@@ -360,6 +369,7 @@ def test_stt_network_failures_are_safe_and_not_retried(client, provider, tempora
     (httpx.Response(200, json={}), 502), (stt(transcript=123), 502),
     (stt(transcript="a" * 8001), 502), (stt(transcript=" \n\t"), 422),
     (httpx.Response(200, content=b"x" * (voice_provider.MAX_PROVIDER_BYTES + 1)), 502),
+    (httpx.Response(200, content=b'{"transcript":"\\ud800"}'), 502),
 ])
 def test_malformed_or_silent_stt_never_runs_extraction(client, provider, temporary_files, caplog, response, expected):
     provider[1][:] = [response]
@@ -427,6 +437,14 @@ def test_unreliable_detected_language_is_null(client, provider, language):
     assert any("language" in item for item in body["warnings"])
 
 
+def test_malformed_unicode_description_falls_back_to_valid_transcript(client, provider):
+    provider[1][:] = [stt(), chat(message={"content": '{"description":"\\ud800"}'})]
+    response = draft(client)
+    assert response.status_code == 200
+    assert response.json()["fields"]["description"] == TRANSCRIPT
+    assert any("Description" in warning for warning in response.json()["warnings"])
+
+
 def test_other_registered_venue_zone_is_not_accepted(client, provider):
     with SessionLocal.begin() as db:
         db.add(VenueRecord(id="other", name="Other", description="Other", venue="Other", location_label="Other", status="active"))
@@ -459,7 +477,7 @@ def test_prompt_injection_and_invented_identity_gps_are_not_executed(client, pro
 
 def test_rate_limit_is_per_verified_user_and_expires(client, provider, monkeypatch):
     clock = [100.0]
-    monkeypatch.setattr(voice.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(voice, "monotonic", lambda: clock[0])
     # Invalid consent counts too, preventing repeated multipart work for free.
     for _ in range(3):
         assert draft(client, data={"venue_id": "venue-test", "consent": "false"}).status_code == 422
@@ -513,3 +531,57 @@ def test_upload_timeout_cleans_up_and_releases(client, provider, temporary_files
     assert temporary_files
     assert not voice.limiter._active
     assert provider[0] == []
+
+
+@pytest.mark.parametrize("failure", ["oversize", "disconnect", "cancel"])
+def test_partial_stream_failure_always_closes_created_files(temporary_files, failure):
+    # Unlike TestClient's aggregated bodies, this delivers separate ASGI chunks
+    # with neither Content-Length nor a fully buffered body.
+    prefix = b'--x\r\nContent-Disposition: form-data; name="audio"; filename="a.m4a"\r\nContent-Type: audio/mp4\r\n\r\naudio'
+    chunks = iter([
+        {"type": "http.request", "body": prefix, "more_body": True},
+        {"type": "http.request", "body": b"x" * voice.MAX_REQUEST_BYTES, "more_body": False},
+    ])
+    received = 0
+    async def receive():
+        nonlocal received
+        received += 1
+        if received > 1:
+            if failure == "disconnect":
+                return {"type": "http.disconnect"}
+            if failure == "cancel":
+                raise asyncio.CancelledError
+        return next(chunks)
+    request = Request({"type": "http", "headers": [(b"content-type", b"multipart/form-data; boundary=x")]}, receive)
+    async def run():
+        async with voice.bounded_form(request):
+            pytest.fail("Partial stream must be rejected")
+    if failure == "cancel":
+        with pytest.raises(asyncio.CancelledError):
+            asyncio.run(run())
+    else:
+        with pytest.raises(voice.HTTPException) as error:
+            asyncio.run(run())
+        assert error.value.status_code == (413 if failure == "oversize" else 422)
+    assert temporary_files and all(handle.closed for handle in temporary_files)
+
+
+@pytest.mark.parametrize("stage", ["stt", "extraction"])
+def test_provider_wall_clock_deadline_includes_slow_streaming(client, provider, temporary_files, monkeypatch, stage):
+    class SlowBody(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            await asyncio.sleep(0.05)
+            yield b"{}"
+    monkeypatch.setattr(voice_provider, "PROVIDER_TIMEOUT_SECONDS", 0.01)
+    slow = httpx.Response(200, stream=SlowBody())
+    provider[1][:] = [slow] if stage == "stt" else [stt(), slow]
+    result = draft(client)
+    if stage == "stt":
+        assert result.status_code == 504
+        assert len(provider[0]) == 1
+    else:
+        assert result.status_code == 200
+        assert result.json()["transcript"] == TRANSCRIPT
+        assert voice_provider.EXTRACTION_WARNING in result.json()["warnings"]
+        assert len(provider[0]) == 2
+    assert not voice.limiter._active
