@@ -31,23 +31,23 @@ Voice is a separate draft-only branch: authenticated audio + consent → FastAPI
 
 ## Code navigation
 
-| Path | Responsibility |
-| --- | --- |
-| `services/api/src/shaktios_api/main.py` | HTTP/WS routes, access dependencies, ingestion, operator transitions and webhook delivery |
-| `auth.py` | Supabase JWKS verification, verified identity and operator capability |
-| `models.py`, `incident_models.py`, `report_models.py`, `venue_models.py` | API models |
-| `event_store.py`, `incident_store.py`, `risk.py` | Persistence, deterministic correlation and factor calculation |
-| `report_store.py`, `venue_store.py`, `timeline_store.py` | Ownership-filtered reports, venue/zone registry and incident history |
-| `database.py` | SQLAlchemy engine/session, local root environment loading and SQLite test support |
-| `voice.py`, `voice_provider.py` | Bounded voice upload, consent, provider requests and draft validation |
-| `realtime.py` | In-memory event/incident connection managers |
-| `apps/dashboard/lib/api.ts`, `lib/realtime.ts` | Authenticated HTTP client and reconnecting WebSockets |
-| `apps/dashboard/components/dashboard/operator-session.tsx` | Operator route gate |
-| `apps/dashboard/hooks/`, `components/situation-map.tsx` | Snapshots, timeline refresh and coordinate-based map |
-| `intelligence/`, `simulator/crowd/` | Source normalization and synthetic inputs; see [Events](EVENTS.md) |
-| `supabase/migrations/` | Authoritative SQL schema, indexes, RLS and reserved storage bucket |
-| `n8n/shaktios-action-handoff.json` | Importable acknowledgement-only workflow |
-| Sibling `shaktios-app/src/api/`, `src/store/`, `app/` | Citizen API client, session/draft/venue state and Expo Router screens |
+| Path                                                                     | Responsibility                                                                            |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `services/api/src/shaktios_api/main.py`                                  | HTTP/WS routes, access dependencies, ingestion, operator transitions and webhook delivery |
+| `auth.py`                                                                | Supabase JWKS verification, verified identity and operator capability                     |
+| `models.py`, `incident_models.py`, `report_models.py`, `venue_models.py` | API models                                                                                |
+| `event_store.py`, `incident_store.py`, `risk.py`                         | Persistence, deterministic correlation and factor calculation                             |
+| `report_store.py`, `venue_store.py`, `timeline_store.py`                 | Ownership-filtered reports, venue/zone registry and incident history                      |
+| `database.py`                                                            | SQLAlchemy engine/session, local root environment loading and SQLite test support         |
+| `voice.py`, `voice_provider.py`                                          | Bounded voice upload, consent, provider requests and draft validation                     |
+| `realtime.py`                                                            | In-memory event/incident connection managers                                              |
+| `apps/dashboard/lib/api.ts`, `lib/realtime.ts`                           | Authenticated HTTP client and reconnecting WebSockets                                     |
+| `apps/dashboard/components/dashboard/operator-session.tsx`               | Operator route gate                                                                       |
+| `apps/dashboard/hooks/`, `components/situation-map.tsx`                  | Snapshots, timeline refresh and coordinate-based map                                      |
+| `intelligence/`, `simulator/crowd/`                                      | Source normalization and synthetic inputs; see [Events](EVENTS.md)                        |
+| `supabase/migrations/`                                                   | Authoritative SQL schema, indexes, RLS and reserved storage bucket                        |
+| `n8n/shaktios-action-handoff.json`                                       | Importable acknowledgement-only workflow                                                  |
+| Sibling `shaktios-app/src/api/`, `src/store/`, `app/`                    | Citizen API client, session/draft/venue state and Expo Router screens                     |
 
 Bare Python filenames in the table are relative to `services/api/src/shaktios_api/`. `packages/types` shares the TypeScript Event shape; it is not a generated cross-repository SDK. Dashboard and mobile also maintain their own API types, so contract changes need caller checks in both repos.
 
