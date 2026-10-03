@@ -4,63 +4,74 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Shared visual language with shaktios-app. Keep these values in sync with
+   sibling app/global.css and shaktios-app/lib/theme.ts. */
 :root {
-  --background: oklch(0.975 0.018 95);
-  --foreground: oklch(0.24 0.025 255);
-  --card: oklch(0.995 0.008 95);
-  --card-foreground: oklch(0.24 0.025 255);
-  --popover: oklch(0.995 0.008 95);
-  --popover-foreground: oklch(0.24 0.025 255);
-  --primary: oklch(0.55 0.21 292);
-  --primary-foreground: oklch(0.98 0.01 95);
-  --secondary: oklch(0.91 0.03 90);
-  --secondary-foreground: oklch(0.31 0.035 255);
-  --muted: oklch(0.94 0.018 95);
-  --muted-foreground: oklch(0.48 0.035 255);
-  --accent: oklch(0.88 0.08 55);
-  --accent-foreground: oklch(0.31 0.06 35);
-  --destructive: oklch(0.55 0.18 25);
-  --border: oklch(0.86 0.025 90);
-  --input: oklch(0.86 0.025 90);
-  --ring: oklch(0.55 0.21 292);
-  --success: oklch(0.55 0.12 145);
-  --success-foreground: oklch(0.98 0.01 95);
-  --warning: oklch(0.72 0.15 75);
-  --warning-foreground: oklch(0.28 0.05 70);
-  --info: oklch(0.57 0.14 235);
-  --info-foreground: oklch(0.98 0.01 95);
-  --chart-1: oklch(0.55 0.21 292);
-  --chart-2: oklch(0.57 0.14 235);
-  --chart-3: oklch(0.55 0.18 25);
-  --chart-4: oklch(0.72 0.15 75);
-  --chart-5: oklch(0.55 0.12 145);
-  --sidebar: oklch(0.94 0.018 95);
-  --sidebar-foreground: oklch(0.24 0.025 255);
-  --sidebar-primary: oklch(0.55 0.21 292);
-  --sidebar-primary-foreground: oklch(0.98 0.01 95);
-  --sidebar-accent: oklch(0.88 0.08 55);
-  --sidebar-accent-foreground: oklch(0.31 0.06 35);
-  --sidebar-border: oklch(0.86 0.025 90);
-  --sidebar-ring: oklch(0.55 0.21 292);
-  --severity-critical: oklch(0.55 0.18 25);
-  --severity-high: oklch(0.57 0.14 235);
-  --severity-medium: oklch(0.72 0.15 75);
-  --severity-low: oklch(0.55 0.12 145);
-  
-  --shadow-2xs: 0px 4px 8px -1px oklch(0.24 0.025 255 / 0.05);
-  --shadow-xs: 0px 4px 8px -1px oklch(0.24 0.025 255 / 0.05);
-  --shadow-sm: 0px 4px 8px -1px oklch(0.24 0.025 255 / 0.1), 0px 1px 2px -2px oklch(0.24 0.025 255 / 0.1);
-  --shadow: 0px 4px 8px -1px oklch(0.24 0.025 255 / 0.1), 0px 1px 2px -2px oklch(0.24 0.025 255 / 0.1);
-  --shadow-md: 0px 4px 8px -1px oklch(0.24 0.025 255 / 0.1), 0px 2px 4px -2px oklch(0.24 0.025 255 / 0.1);
-  --shadow-lg: 0px 4px 8px -1px oklch(0.24 0.025 255 / 0.1), 0px 4px 6px -2px oklch(0.24 0.025 255 / 0.1);
-  --shadow-xl: 0px 4px 8px -1px oklch(0.24 0.025 255 / 0.1), 0px 8px 10px -2px oklch(0.24 0.025 255 / 0.1);
-  --shadow-2xl: 0px 4px 8px -1px oklch(0.24 0.025 255 / 0.25);
+  --background: #f6f7f9;
+  --foreground: #1d293d;
+  --card: #ffffff;
+  --card-foreground: #1d293d;
+  --popover: #ffffff;
+  --popover-foreground: #1d293d;
+  --primary: #6468f0;
+  --primary-foreground: #ffffff;
+  --secondary: #e4e8ef;
+  --secondary-foreground: #364050;
+  --muted: #f5f5f5;
+  --muted-foreground: #6c727e;
+  --accent: #e1e7fd;
+  --accent-foreground: #364050;
+  --destructive: #f14444;
+  --destructive-foreground: #ffffff;
+  --border: #dbe0e9;
+  --input: #dbe0e9;
+  --ring: #6468f0;
+  --success: #12a594;
+  --success-foreground: #ffffff;
+  --warning: #e8830c;
+  --warning-foreground: #7c4a00;
+  --info: #2f6fed;
+  --info-foreground: #ffffff;
+  --chart-1: #6468f0;
+  --chart-2: #4f46e5;
+  --chart-3: #e8830c;
+  --chart-4: #2f6fed;
+  --chart-5: #12a594;
+  --sidebar: #f5f5f5;
+  --sidebar-foreground: #1d293d;
+  --sidebar-primary: #6468f0;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e1e7fd;
+  --sidebar-accent-foreground: #364050;
+  --sidebar-border: #dbe0e9;
+  --sidebar-ring: #6468f0;
+  --severity-critical: #e5484d;
+  --severity-high: #2f6fed;
+  --severity-medium: #e8830c;
+  --severity-low: #12a594;
+  --shadow-2xs: 0 2px 8px rgba(29, 41, 61, 0.04);
+  --shadow-xs: 0 3px 12px rgba(29, 41, 61, 0.05);
+  --shadow-sm: 0 6px 18px rgba(29, 41, 61, 0.07);
+  --shadow: 0 8px 24px rgba(29, 41, 61, 0.08);
+  --shadow-md: 0 12px 32px rgba(29, 41, 61, 0.1);
+  --shadow-lg: 0 20px 48px rgba(29, 41, 61, 0.12);
+  --shadow-xl: 0 28px 64px rgba(29, 41, 61, 0.14);
+  --shadow-2xl: 0 36px 80px rgba(29, 41, 61, 0.18);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
+}
+
+::selection {
+  background: #e1e7fd;
+  color: #1d293d;
 }
 
 body {
@@ -94,6 +105,7 @@ body {
   --color-success-foreground: var(--success-foreground);
   --color-input: var(--input);
   --color-border: var(--border);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);

@@ -1,76 +1,60 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CheckCircle2, Signal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { submitEvent, type Event } from "@/lib/api";
-import { EVENT_TYPES } from "@/lib/format";
+import { submitEvent, type Event, type Venue } from "@/lib/api";
 
-/** Known demo locations (Ranchi gates + Kolkata Durga Puja pandals). Free text still allowed. */
-const LOCATION_SUGGESTIONS = [
-  "gate_1",
-  "gate_2",
-  "gate_3",
-  "gate_4",
-  "gate_9",
-  "kol_sreebhumi",
-  "kol_santosh_mitra",
-  "kol_college_square",
-  "kol_mohammad_ali_park",
-  "kol_bagbazar",
-  "kol_kumartuli",
-  "kol_suruchi_sangha",
-  "kol_ekdalia",
-  "kol_deshapriya_park",
-  "kol_maddox_square",
-  "kol_chetla_agrani",
-  "kol_dumdum_park",
-];
-
-/** Test-signal dialog. Writes through POST /events — never local-only. */
-export function SignalDialog({ onCreated }: { onCreated?: (event: Event) => void }) {
+/** A real operator-authored report, never a generated sensor signal. */
+export function SignalDialog({ onCreated, venues = [] }: { onCreated?: (event: Event) => void; venues?: Venue[] }) {
   const [open, setOpen] = useState(false);
-  const [eventType, setEventType] = useState<string>("crowd_density");
-  const [location, setLocation] = useState("gate_4");
-  const [intensity, setIntensity] = useState(72);
+  const [venueId, setVenueId] = useState("");
+  const [zoneId, setZoneId] = useState("");
+  const [confidence, setConfidence] = useState("");
+  const [category, setCategory] = useState("");
+  const [urgency, setUrgency] = useState("");
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+
+  const selectedVenue = useMemo(() => venues.find((venue) => venue.id === venueId), [venues, venueId]);
+  const selectedZone = selectedVenue?.zones.find((zone) => zone.id === zoneId);
+  const confidenceNumber = Number(confidence);
+  const valid = Boolean(selectedZone && note.trim() && category && urgency && confidence.trim())
+    && Number.isFinite(confidenceNumber) && confidenceNumber >= 0 && confidenceNumber <= 100;
 
   const submit = async (formEvent: React.FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault();
+    if (!valid || !selectedZone || !selectedVenue || sending) return;
     setSending(true);
     setSent(false);
-    setFailed(false);
+    setFailure(null);
     try {
-      const level = intensity / 100;
       const created = await submitEvent({
-        type: eventType,
-        source: "dashboard_demo",
-        location,
-        confidence: level,
-        payload:
-          eventType === "crowd_density"
-            ? { density: level }
-            : eventType === "social_concern"
-              ? { velocity: level }
-              : eventType === "citizen_report"
-                ? {
-                    description: note.trim() || "Operator test report",
-                    category: "other",
-                    urgency: "unknown",
-                  }
-                : { score: level },
+        type: "citizen_report",
+        source: "dashboard_observation",
+        location: selectedZone.id,
+        confidence: confidenceNumber / 100,
+        payload: {
+          venue_event_id: selectedVenue.id,
+          zone_id: selectedZone.id,
+          latitude: selectedZone.latitude,
+          longitude: selectedZone.longitude,
+          description: note.trim(),
+          category,
+          urgency,
+        },
       });
       onCreated?.(created);
       setSent(true);
-      setTimeout(() => setOpen(false), 1200);
-    } catch {
-      setFailed(true);
+      setNote("");
+    } catch (cause) {
+      setFailure(cause instanceof Error ? cause.message : "Observation could not be saved.");
     } finally {
       setSending(false);
     }
@@ -79,108 +63,38 @@ export function SignalDialog({ onCreated }: { onCreated?: (event: Event) => void
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button className="rounded-full font-medium" size="sm" />}>
-        <Signal className="size-4" aria-hidden />
-        New signal
+        <Signal className="size-4" aria-hidden />New observation
       </DialogTrigger>
-      <DialogContent className="rounded-[1.75rem] sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-medium tracking-[-0.03em]">
-            Submit a test signal
-          </DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          Posts a normalized event to the backend, where correlation and risk run. Nothing is
-          stored locally only.
-        </p>
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[1.75rem] sm:max-w-md">
+        <DialogHeader><DialogTitle className="text-xl font-medium tracking-[-0.03em]">Record an observation</DialogTitle></DialogHeader>
+        <p className="text-sm text-muted-foreground">Record what you actually observed. This creates a report linked to your authenticated identity; it does not generate sensor measurements.</p>
         <form className="space-y-4 pt-2" onSubmit={submit}>
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground" htmlFor="signal-type">
-              Signal type
-            </label>
-            <Select value={eventType} onValueChange={(v) => v && setEventType(v)}>
-              <SelectTrigger id="signal-type" className="h-11 w-full rounded-2xl bg-muted font-medium">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {EVENT_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t.replaceAll("_", " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-baseline justify-between">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="signal-intensity">
-                Intensity
-              </label>
-              <span className="text-xs font-semibold tabular-nums">{intensity}%</span>
-            </div>
-            <input
-              id="signal-intensity"
-              type="range"
-              min={5}
-              max={100}
-              value={intensity}
-              onChange={(event) => setIntensity(Number(event.target.value))}
-              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
-              aria-describedby="signal-intensity-hint"
-            />
-            <p id="signal-intensity-hint" className="text-[11px] text-muted-foreground">
-              Drives density / velocity / score and confidence. Higher values raise the
-              deterministic risk contribution.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground" htmlFor="signal-location">
-              Location
-            </label>
-            <Input
-              id="signal-location"
-              className="h-11 rounded-2xl bg-muted font-medium"
-              value={location}
-              onChange={(event) => setLocation(event.target.value)}
-              list="signal-location-suggestions"
-            />
-            <datalist id="signal-location-suggestions">
-              {LOCATION_SUGGESTIONS.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
-          </div>
-          {eventType === "citizen_report" && (
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="signal-note">
-                Report description
-              </label>
-              <Input
-                id="signal-note"
-                className="h-11 rounded-2xl bg-muted font-medium"
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-                placeholder="What did the citizen observe?"
-              />
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="signal-venue">Venue</label>
+              <Select value={venueId} onValueChange={(value) => { setVenueId(value ?? ""); setZoneId(""); }}>
+                <SelectTrigger id="signal-venue" className="h-11 w-full rounded-2xl bg-muted font-medium"><SelectValue placeholder="Select venue" /></SelectTrigger>
+                <SelectContent>{venues.map((venue) => <SelectItem key={venue.id} value={venue.id}>{venue.name}</SelectItem>)}</SelectContent>
+              </Select>
             </div>
-          )}
-          <Button
-            className="h-11 w-full rounded-full font-medium"
-            disabled={sending || !location.trim()}
-            type="submit"
-          >
-            {sending ? "Sending…" : "Submit signal"}
-          </Button>
-          {sent && (
-            <p className="flex items-center gap-2 text-sm font-medium text-success" role="status">
-              <CheckCircle2 className="size-4" aria-hidden />
-              Signal accepted by the backend.
-            </p>
-          )}
-          {failed && (
-            <p className="text-sm font-medium text-destructive" role="alert">
-              Submission failed. Is the API running?
-            </p>
-          )}
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="signal-zone">Zone</label>
+              <Select value={zoneId} onValueChange={(value) => setZoneId(value ?? "")}>
+                <SelectTrigger id="signal-zone" className="h-11 w-full rounded-2xl bg-muted font-medium"><SelectValue placeholder="Select zone" /></SelectTrigger>
+                <SelectContent>{selectedVenue?.zones.map((zone) => <SelectItem key={zone.id} value={zone.id}>{zone.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2"><label className="text-xs font-medium text-muted-foreground" htmlFor="signal-category">Category</label><Select value={category} onValueChange={(value) => setCategory(value ?? "")}><SelectTrigger id="signal-category" className="h-11 w-full rounded-2xl bg-muted"><SelectValue placeholder="Select category" /></SelectTrigger><SelectContent>{["crowding", "blocked_access", "medical", "safety", "other"].map((item) => <SelectItem key={item} value={item}>{item.replaceAll("_", " ")}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-2"><label className="text-xs font-medium text-muted-foreground" htmlFor="signal-urgency">Urgency</label><Select value={urgency} onValueChange={(value) => setUrgency(value ?? "")}><SelectTrigger id="signal-urgency" className="h-11 w-full rounded-2xl bg-muted"><SelectValue placeholder="Select urgency" /></SelectTrigger><SelectContent>{["low", "medium", "high", "critical", "unknown"].map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
+          </div>
+          <div className="space-y-2"><label className="text-xs font-medium text-muted-foreground" htmlFor="signal-confidence">Your confidence in this observation (%)</label><Input id="signal-confidence" type="number" min={0} max={100} required value={confidence} onChange={(event) => setConfidence(event.target.value)} className="h-11 rounded-2xl bg-muted" /></div>
+          <div className="space-y-2"><label className="text-xs font-medium text-muted-foreground" htmlFor="signal-note">What did you observe?</label><Textarea id="signal-note" className="min-h-24 rounded-2xl bg-muted" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Describe the observation" required maxLength={2000} /></div>
+          {!venues.length && <p className="text-sm text-warning-foreground" role="status">No observation zones are available from the API.</p>}
+          <Button className="h-11 w-full rounded-full font-medium" disabled={sending || !valid} type="submit">{sending ? "Saving…" : "Save observation"}</Button>
+          {sent && <p className="flex items-center gap-2 text-sm font-medium text-success" role="status"><CheckCircle2 className="size-4" aria-hidden />Observation accepted by the backend.</p>}
+          {failure && <p className="text-sm font-medium text-destructive" role="alert">{failure}</p>}
         </form>
       </DialogContent>
     </Dialog>

@@ -90,7 +90,9 @@ def verify_token(token: str) -> AuthUser:
     if not isinstance(subject, str) or not subject:
         raise AuthError("Invalid or expired credentials")
     email = claims.get("email")
-    role = claims.get("role")
+    metadata = claims.get("app_metadata")
+    app_role = metadata.get("role") if isinstance(metadata, dict) else None
+    role = app_role if app_role in {"operator", "admin"} else claims.get("role")
     return AuthUser(
         id=subject,
         email=email if isinstance(email, str) else None,
@@ -112,6 +114,23 @@ def get_optional_user(
     return verify_token(credentials.credentials)
 
 
+def is_operator(user: AuthUser) -> bool:
+    """Return whether a verified Supabase identity may use operator controls."""
+    if user.role in {"operator", "admin", "service_role"}:
+        return True
+    allowed_ids = {
+        value.strip()
+        for value in os.getenv("OPERATOR_USER_IDS", "").split(",")
+        if value.strip()
+    }
+    allowed_emails = {
+        value.strip().lower()
+        for value in os.getenv("OPERATOR_EMAILS", "").split(",")
+        if value.strip()
+    }
+    return user.id in allowed_ids or (user.email or "").lower() in allowed_emails
+
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> AuthUser:
@@ -119,3 +138,9 @@ def get_current_user(
     if credentials is None or not credentials.credentials:
         raise AuthError("Authentication required")
     return verify_token(credentials.credentials)
+
+
+def get_operator_user(user: AuthUser = Depends(get_current_user)) -> AuthUser:
+    if not is_operator(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operator access required")
+    return user

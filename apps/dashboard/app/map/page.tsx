@@ -17,7 +17,7 @@ import { label, riskPercent, SEVERITIES, STATUSES, timeAgo } from "@/lib/format"
 const SituationMap = dynamic(() => import("@/components/situation-map"), { ssr: false });
 
 export default function MapPage() {
-  const { incidents, loading, error, refresh } = useShaktiData();
+  const { incidents, venues, loading, error, refresh } = useShaktiData();
   const [severity, setSeverity] = useState("all");
   const [status, setStatus] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -85,11 +85,11 @@ export default function MapPage() {
           <Card className="overflow-hidden rounded-[1.75rem] bg-card py-0 ring-0">
             <CardContent className="p-0">
               {active.length > 0 ? (
-                <SituationMap incidents={active.slice(0, 20)} />
+                <SituationMap incidents={active.slice(0, 20)} venues={venues} />
               ) : (
                 <EmptyState
                   title="No incidents to plot"
-                  hint="Active incidents appear on the Ranchi gate / Kolkata pandal map as they are correlated."
+                  hint="Incidents with API or venue-zone coordinates appear here as they are correlated."
                   className="min-h-[420px]"
                 />
               )}
@@ -107,7 +107,7 @@ export default function MapPage() {
                 </span>
               ))}
               <span className="ml-auto hidden sm:inline">
-                Deterministic demo visualization — not production GIS.
+                Coordinates are plotted only when returned by the API or venue registry.
               </span>
             </div>
           </Card>

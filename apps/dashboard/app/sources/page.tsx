@@ -34,7 +34,7 @@ const BOUNDARY_NOTES: Array<{ title: string; body: string }> = [
 ];
 
 export default function SourcesPage() {
-  const { incidents, events, loading, error, refresh } = useShaktiData();
+  const { events, loading, error, refresh } = useShaktiData();
 
   const groups = useMemo(() => {
     const map = new Map<string, typeof events>();
@@ -48,13 +48,11 @@ export default function SourcesPage() {
         const sorted = [...list].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
         const latest = sorted[0]!;
         const avgConfidence = list.reduce((s, e) => s + e.confidence, 0) / list.length;
-        const incidentLocations = new Set(
-          incidents.filter((i) => list.some((e) => e.location === i.location)).map((i) => i.id),
-        );
-        return { source, count: list.length, latest, avgConfidence, linkedIncidents: incidentLocations.size };
+        const linkedIncidents = new Set(list.map((event) => event.incident_id).filter((id): id is string => Boolean(id)));
+        return { source, count: list.length, latest, avgConfidence, linkedIncidents: linkedIncidents.size };
       })
       .sort((a, b) => b.count - a.count);
-  }, [events, incidents]);
+  }, [events]);
 
   return (
     <OperatorShell>

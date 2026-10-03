@@ -51,7 +51,7 @@ SHAKTIOS_API_URL=http://localhost:8000
 N8N_WEBHOOK_URL=
 ```
 
-`N8N_WEBHOOK_URL` is optional until the n8n workflow is hosted and activated.
+`N8N_WEBHOOK_URL` is optional until the n8n workflow is hosted and activated. Import `n8n/shaktios-action-handoff.json` and follow [n8n/README.md](n8n/README.md) to configure the human-approved action handoff.
 
 Apply the database schema (the single authoritative migration set):
 
@@ -62,6 +62,22 @@ supabase db push
 ```
 
 For an offline smoke test without Supabase, set `DATABASE_URL=sqlite+pysqlite:///./shaktios-local.db` before starting the API. SQLite is for smoke tests only — Supabase PostgreSQL is the runtime database.
+
+Seed the database-backed venue registry and dashboard scenarios without truncating existing data:
+
+```powershell
+# From shakti-os, after installing services/api and applying migrations:
+services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --dry-run
+services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --apply
+```
+
+The default is dry-run. `--apply` inserts 3 labelled seed venues, 9 zones, 9 incidents, 63 events and 74 timeline entries in one transaction. Deterministic IDs are skipped on reruns; existing records are not overwritten. These are **synthetic seed scenarios stored in Supabase**, not live emergency observations. No Auth users, contacts, citizen identities, or n8n calls are created.
+
+### Operator access
+
+Sign in using an existing Supabase email/password account. In the root `.env`, set `OPERATOR_USER_IDS=<your-user-uuid>` or `OPERATOR_EMAILS=<your-verified-email>` and restart FastAPI. Trusted `app_metadata.role` values `operator` and `admin` also grant access. `/me` must return `is_operator: true`; there is no demo-login bypass. Do not grant this capability to every citizen account.
+
+See [docs/REAL_DATA.md](docs/REAL_DATA.md) for data contracts, seed verification, smoke steps, and remaining external integrations.
 
 ## Run the frontend
 
@@ -86,7 +102,7 @@ cd services/api
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[test]"
-uvicorn shaktios_api.main:app --app-dir src --reload --port 8000
+uvicorn shaktios_api.main:app --app-dir src --env-file ../../.env --reload --port 8000
 ```
 
 Run `supabase db push` once to deploy the schema before starting the server. Check `http://localhost:8000/health`. Events can be submitted to `POST http://localhost:8000/events` and read with `GET http://localhost:8000/events`; see [docs/API.md](docs/API.md). Supabase Auth is the identity provider for citizen clients; see [docs/SUPABASE.md](docs/SUPABASE.md).

@@ -26,7 +26,9 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { RealtimeStatus } from "@/components/dashboard/realtime-status";
-import { apiUrl, websocketUrl } from "@/lib/api";
+import { getEvents, getIncidents, websocketUrl, type Me } from "@/lib/api";
+import { useOperatorIdentity } from "@/components/dashboard/operator-session";
+import { accessToken } from "@/lib/supabase";
 import { label, timeAgo } from "@/lib/format";
 import { subscribeWithReconnect, type ConnectionState } from "@/lib/realtime";
 import { cn } from "@/lib/utils";
@@ -52,11 +54,14 @@ function isActive(pathname: string, href: string) {
 function SidebarBody({
   collapsed,
   onNavigate,
+  me,
 }: {
   collapsed: boolean;
   onNavigate?: () => void;
+  me?: Me | null;
 }) {
   const pathname = usePathname();
+  const initials = (me?.email ?? "OP").slice(0, 2).toUpperCase();
   return (
     <div className="flex h-full flex-col">
       <Link
@@ -133,14 +138,14 @@ function SidebarBody({
             className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary"
             aria-hidden
           >
-            OP
+            {initials}
           </span>
           {!collapsed && (
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">Operator</span>
+              <span className="block truncate text-sm font-medium">{me?.email ?? "Operator"}</span>
               <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <span className="size-1.5 rounded-full bg-success" />
-                On duty
+                {me?.role ?? "Operator"}
               </span>
             </span>
           )}
@@ -172,10 +177,10 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (v:
     }
     setLoading(true);
     Promise.all([
-      fetch(`${apiUrl}/incidents?limit=50`).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${apiUrl}/events?limit=50`).then((r) => (r.ok ? r.json() : [])),
+      getIncidents().catch(() => []),
+      getEvents().catch(() => []),
     ])
-      .then(([incidents, events]: [Array<Record<string, string>>, Array<Record<string, string>>]) => {
+      .then(([incidents, events]) => {
         const mapped: SearchResult[] = [
           ...(Array.isArray(incidents) ? incidents : []).map((i) => ({
             key: `incident-${i.id}`,
@@ -281,6 +286,7 @@ function titleFor(pathname: string) {
 
 export function OperatorShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const me = useOperatorIdentity();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -293,13 +299,14 @@ export function OperatorShell({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const stopIncidents = subscribeWithReconnect(websocketUrl("/ws/incidents"), () => {}, setIncidentState);
-    const stopEvents = subscribeWithReconnect(websocketUrl("/ws/events"), () => {}, setEventState);
+    if (!me?.is_operator) return;
+    const stopIncidents = subscribeWithReconnect(websocketUrl("/ws/incidents"), accessToken, () => {}, setIncidentState);
+    const stopEvents = subscribeWithReconnect(websocketUrl("/ws/events"), accessToken, () => {}, setEventState);
     return () => {
       stopIncidents();
       stopEvents();
     };
-  }, []);
+  }, [me]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -319,6 +326,8 @@ export function OperatorShell({ children }: { children: ReactNode }) {
     });
   };
 
+  const initials = (me?.email ?? "OP").slice(0, 2).toUpperCase();
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Desktop sidebar */}
@@ -329,7 +338,7 @@ export function OperatorShell({ children }: { children: ReactNode }) {
         )}
         aria-label="Operator navigation"
       >
-        <SidebarBody collapsed={collapsed} />
+        <SidebarBody collapsed={collapsed} me={me} />
         <button
           type="button"
           onClick={toggleCollapsed}
@@ -346,7 +355,7 @@ export function OperatorShell({ children }: { children: ReactNode }) {
           <DialogHeader className="sr-only">
             <DialogTitle>Operator navigation</DialogTitle>
           </DialogHeader>
-          <SidebarBody collapsed={false} onNavigate={() => setMobileOpen(false)} />
+          <SidebarBody collapsed={false} me={me} onNavigate={() => setMobileOpen(false)} />
         </DialogContent>
       </Dialog>
 
@@ -394,23 +403,23 @@ export function OperatorShell({ children }: { children: ReactNode }) {
               <Search className="size-4" aria-hidden />
             </Button>
             <RealtimeStatus incidentState={incidentState} eventState={eventState} compact />
-            <Button variant="ghost" size="icon-sm" className="hidden rounded-full sm:inline-flex" aria-label="Notifications">
+            <Link href="/timeline" className="hidden rounded-full p-2 text-muted-foreground hover:bg-muted sm:inline-flex" aria-label="Open activity timeline">
               <Bell className="size-4" aria-hidden />
-            </Button>
+            </Link>
             <Link
               href="/settings"
               className="flex size-8 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary"
               aria-label="Operator profile and settings"
-              title="Operator · On duty"
+              title={`${me?.email ?? "Operator"} · ${me?.role ?? "operator"}`}
             >
-              OP
+              {initials}
             </Link>
           </div>
         </header>
         <main className="px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         <footer className="flex items-center justify-between px-4 pb-6 text-[11px] text-muted-foreground sm:px-6 lg:px-8">
           <span>Operators retain control — detection never acts autonomously.</span>
-          <span className="hidden sm:inline">ShaktiOS · Human-approved response</span>
+          <span className="hidden sm:inline">Recent snapshot · Up to 200 incidents / events · Seed sources are labelled</span>
         </footer>
       </div>
     </div>

@@ -1,5 +1,22 @@
 # API
 
+## Authentication and access
+
+All operator reads (`/events`, `/incidents`, related evidence/timelines, `/integrations`) and status/action writes require `Authorization: Bearer <Supabase access token>` **and operator capability**. Missing/invalid credentials return `401`; a citizen attempting operator endpoints receives `403`. Operators are granted using `OPERATOR_USER_IDS`, `OPERATOR_EMAILS`, or trusted `app_metadata.role=operator|admin`. `GET /me` returns `{id,email,role,is_operator}`.
+
+Public routes are `/health`, `/venues`, `/venues/{id}` and `/public/overview`. The overview returns database-wide counts plus field-projected incident/event summaries; it never returns report payloads or reporter identities. It includes `seeded_event_count` so clients can label seeded data.
+
+### Citizen report and venue routes
+
+- `GET /venues`: registered venues and canonical zones, including nullable `startTime`, `endTime`, and `helpline`.
+- `GET /venues/{id}`: a venue or `404`.
+- `GET /me/reports?limit=50&offset=0`: verified citizen's reports, filtered by ownership **before** pagination (limit 1–100).
+- `GET /me/reports/{id}`: one owned report; `404` for missing or unowned IDs.
+- Report responses include `incident_id`, `incident_status`, `report_status` and `venue_name` alongside event fields. Status follows the persisted incident: `DETECTED → received`, `ASSESSING → under_review`, `RESPONDING → action_initiated`, `RESOLVED → resolved`; no incident means `submitted`. `RESPONDING` is an operator workflow state, not confirmation that responders were dispatched.
+- `GET /incidents/{id}/events`: operator-only evidence filtered by the actual incident association, not a matching location string.
+- `GET /integrations`: operator-only n8n configuration/secret-presence flags. Configuration is not a live delivery health check.
+
+
 ## `GET /health`
 
 Returns the service status for local health checks.
@@ -34,7 +51,7 @@ Authentication is via Supabase Auth: citizen clients send
 for machine signal sources, but a present-but-invalid token is rejected
 with `401`. For `citizen_report` events, any client-supplied identity is
 stripped and `reporter_id` is stamped server-side from the verified JWT
-`sub` (see `docs/SUPABASE.md`). `GET /me` returns the verified identity.
+`sub` (see `docs/SUPABASE.md`). Citizen reports require a valid session, `payload.venue_event_id`, and `location` equal to a zone ID belonging to that venue. `incident_id` is always server-owned; duplicate event IDs return `409`. Dashboard-prefixed sources additionally require operator capability. Non-citizen machine ingestion remains open for the local MVP; secure it before public deployment.
 
 ## `GET /events`
 
@@ -101,6 +118,8 @@ Requests a human-approved action for an incident in `RESPONDING` status and forw
 The endpoint returns `503` when the webhook URL is not configured, `502` when delivery fails, and `409` when the incident is not `RESPONDING`. The operator note is forwarded to n8n and successful delivery creates an `action.requested` timeline entry. This integration requests a workflow; it does not execute autonomous emergency action.
 
 ## `WS /ws/incidents`
+
+Both WebSocket routes require the first JSON message within five seconds to be `{"type":"authenticate","token":"<Supabase access token>"}`. Credentials must not be put in the URL. After operator verification the server sends `{"type":"authenticated"}`; invalid or non-operator sessions close with code `1008`. A connection is not live until this acknowledgement is received.
 
 Streams incident updates from the current API process. The connection remains open until the client disconnects. When an event creates or updates an incident, subscribers receive:
 
@@ -188,7 +207,7 @@ The API also creates the `incident_timeline` table:
 
 ## Schema changes
 
-Run `python -m shaktios_api.migrate` from `services/api` after installing the API package. This command is idempotent and creates missing tables/indexes from SQLAlchemy metadata. It does not modify existing columns or constraints. Future non-additive schema changes require an explicit reviewed migration or a documented local PostgreSQL reset; `create_all` is not a replacement for column migrations.
+Run `supabase db push` from `shakti-os` to apply the authoritative SQL migrations. The venue/coordinate migration adds `venues`, `venue_zones`, and nullable incident `latitude`/`longitude`. It enables RLS on venue tables; clients use FastAPI rather than direct table access. Startup `create_all` supports isolated SQLite tests but does not alter existing columns. Do not reset the project to apply these changes. Supabase transaction pooling requires psycopg named preparation disabled (`prepare_threshold=None`), which the API engine configures.
 
 Incidents also expose the current explainable risk state:
 

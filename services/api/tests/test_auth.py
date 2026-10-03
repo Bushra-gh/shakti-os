@@ -19,6 +19,7 @@ from shaktios_api.event_store import EventRecord
 from shaktios_api.incident_store import IncidentRecord
 from shaktios_api.main import app
 from shaktios_api.timeline_store import TimelineEntryRecord
+from shaktios_api.venue_store import VenueRecord, VenueZoneRecord
 
 
 @pytest.fixture
@@ -28,6 +29,23 @@ def client() -> TestClient:
             db.query(EventRecord).delete()
             db.query(IncidentRecord).delete()
             db.query(TimelineEntryRecord).delete()
+            db.query(VenueZoneRecord).delete()
+            db.query(VenueRecord).delete()
+            db.add(VenueRecord(
+                id="venue-test",
+                name="Test Venue",
+                description="Test venue",
+                venue="Test venue",
+                location_label="Gate 4",
+                status="active",
+            ))
+            db.add(VenueZoneRecord(
+                id="gate_4",
+                venue_id="venue-test",
+                label="Gate 4",
+                latitude=23.3441,
+                longitude=85.3096,
+            ))
             db.commit()
         yield test_client
 
@@ -125,19 +143,22 @@ def _citizen_payload(**extra: object) -> dict[str, object]:
         "source": "expo_app",
         "location": "gate_4",
         "confidence": 0.8,
-        "payload": {"description": "Crowd blocking entrance.", "category": "crowding"},
+        "payload": {"description": "Crowd blocking entrance.", "category": "crowd", "venue_event_id": "venue-test"},
         **extra,
     }
 
 
-def test_anonymous_citizen_report_has_no_reporter(client: TestClient) -> None:
+def test_anonymous_citizen_report_is_rejected(client: TestClient) -> None:
     response = client.post("/events", json=_citizen_payload())
-    assert response.status_code == 201
-    body = response.json()
-    assert body["reporter_id"] is None
+    assert response.status_code == 401
 
 
-def test_client_supplied_identity_is_stripped_and_ignored(client: TestClient) -> None:
+def test_client_supplied_identity_is_stripped_and_ignored(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        auth_module, "verify_token", lambda token: AuthUser(id="citizen-abc")
+    )
     payload = _citizen_payload()
     assert isinstance(payload["payload"], dict)
     payload["payload"] = {
@@ -146,10 +167,12 @@ def test_client_supplied_identity_is_stripped_and_ignored(client: TestClient) ->
         "reporter_id": "someone-else",
     }
     payload["reporter_id"] = "someone-else"
-    response = client.post("/events", json=payload)
+    response = client.post(
+        "/events", json=payload, headers={"Authorization": "Bearer valid.token"}
+    )
     assert response.status_code == 201
     body = response.json()
-    assert body["reporter_id"] is None
+    assert body["reporter_id"] == "citizen-abc"
     assert "user_id" not in body["payload"]
     assert "reporter_id" not in body["payload"]
 
@@ -198,6 +221,7 @@ def test_me_returns_verified_identity(
     response = client.get("/me", headers={"Authorization": "Bearer valid.token"})
     assert response.status_code == 200
     assert response.json()["id"] == "citizen-abc"
+    assert response.json()["is_operator"] is False
 
 
 def test_machine_sources_stay_anonymous_and_unaffected(

@@ -62,7 +62,8 @@ python scripts/seed.py
 
 ```powershell
 # Backend (from services/api)
-uvicorn shaktios_api.main:app --app-dir src --reload --port 8000
+# Load the repository root .env so DATABASE_URL and N8N_WEBHOOK_URL reach FastAPI.
+uvicorn shaktios_api.main:app --app-dir src --env-file ../../.env --reload --port 8000
 
 # Dashboard (repo root)
 pnpm --filter @shaktios/dashboard dev

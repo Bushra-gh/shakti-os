@@ -29,17 +29,33 @@ import { RiskFactors, RiskScore } from "@/components/dashboard/risk";
 import { TimelineView } from "@/components/dashboard/timeline-view";
 import { EmptyState } from "@/components/dashboard/states";
 import {
-  apiUrl,
+  getIncident,
+  getIntegrations,
   getTimeline,
   requestIncidentAction,
   updateIncidentStatus,
   websocketUrl,
+  type Event,
   type Incident,
+  type Integrations,
   type TimelineEntry,
 } from "@/lib/api";
-import { useShaktiData } from "@/hooks/use-shakti";
+import { useIncidentEvents } from "@/hooks/use-shakti";
+import { accessToken } from "@/lib/supabase";
 import { subscribeWithReconnect, type ConnectionState } from "@/lib/realtime";
 import { ALLOWED_TRANSITIONS, formatDateTime, formatFullDateTime, label, riskPercent } from "@/lib/format";
+
+/** Backend-provided evidence text. Never invents content: only payload fields. */
+function evidenceDetail(event: Event): { text: string; meta: string } {
+  const payload = event.payload as Record<string, unknown>;
+  const text = ["description", "text", "summary"]
+    .map((key) => payload[key])
+    .find((value): value is string => typeof value === "string" && value.trim().length > 0);
+  const meta = ["urgency", "category", "venue_event_id"]
+    .map((key) => payload[key])
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+  return { text: text ?? "—", meta: meta.join(" · ") };
+}
 
 export default function IncidentDetail({
   params,
@@ -59,37 +75,46 @@ export default function IncidentDetail({
   const [actionType, setActionType] = useState("notify_operator");
   const [reviewOpen, setReviewOpen] = useState(false);
   const [connection, setConnection] = useState<ConnectionState>("CONNECTING");
+  const [integrations, setIntegrations] = useState<Integrations | null>(null);
+  const [integrationError, setIntegrationError] = useState(false);
 
-  const { events } = useShaktiData();
+  const { events, loading: eventsLoading, error: eventsError, reload: reloadEvents } = useIncidentEvents(incidentId);
 
   useEffect(() => {
-    let stop: (() => void) | undefined;
-    params.then(({ incidentId: id }) => {
-      setIncidentId(id);
-      stop = subscribeWithReconnect(
-        websocketUrl("/ws/incidents"),
-        (data) => {
-          try {
-            const update = JSON.parse(data) as { type: string; incident: Incident };
-            if (update.type === "incident.updated" && update.incident.id === id) setIncident(update.incident);
-          } catch {
-            // Ignore malformed payloads; the next fetch recovers.
-          }
-        },
-        setConnection,
-      );
-      fetch(`${apiUrl}/incidents/${id}`)
-        .then((response) => {
-          if (!response.ok) throw new Error();
-          return response.json() as Promise<Incident>;
-        })
-        .then(setIncident)
-        .catch(() => setError(true))
-        .finally(() => setLoading(false));
-      getTimeline(id).then(setTimeline).catch(() => setTimelineError(true));
-    });
-    return () => stop?.();
+    let cancelled = false;
+    params.then(({ incidentId: id }) => { if (!cancelled) setIncidentId(id); });
+    return () => { cancelled = true; };
   }, [params]);
+
+  useEffect(() => {
+    if (!incidentId) return;
+    let cancelled = false;
+    const load = () => {
+      getIncident(incidentId).then((value) => {
+        if (!cancelled) { setIncident(value); setError(false); }
+      }).catch(() => { if (!cancelled) setError(true); })
+        .finally(() => { if (!cancelled) setLoading(false); });
+      getTimeline(incidentId).then((value) => {
+        if (!cancelled) { setTimeline(value); setTimelineError(false); }
+      }).catch(() => { if (!cancelled) setTimelineError(true); });
+      void reloadEvents();
+    };
+    setLoading(true);
+    load();
+    getIntegrations().then((value) => { if (!cancelled) setIntegrations(value); })
+      .catch(() => { if (!cancelled) setIntegrationError(true); });
+    const stop = subscribeWithReconnect(websocketUrl("/ws/incidents"), accessToken, (data) => {
+      try {
+        const update = JSON.parse(data) as { type: string; incident: Incident };
+        if (update.type === "incident.updated" && update.incident?.id === incidentId) load();
+      } catch { /* Ignore invalid frames; polling reloads the authoritative snapshot. */ }
+    }, (state) => {
+      setConnection(state);
+      if (state === "LIVE") load();
+    });
+    const interval = setInterval(load, 15_000);
+    return () => { cancelled = true; clearInterval(interval); stop(); };
+  }, [incidentId, reloadEvents]);
 
   const changeStatus = async (status: string) => {
     if (!incidentId) return;
@@ -97,7 +122,11 @@ export default function IncidentDetail({
     try {
       setIncident(await updateIncidentStatus(incidentId, status, note || undefined));
       setNote("");
-      setTimeline(await getTimeline(incidentId));
+      try {
+        setTimeline(await getTimeline(incidentId));
+        setTimelineError(false);
+      } catch { setTimelineError(true); }
+      await reloadEvents();
     } catch {
       setStatusError(true);
     }
@@ -111,7 +140,13 @@ export default function IncidentDetail({
       await requestIncidentAction(incidentId, actionType, note || undefined);
       setActionState("accepted");
       setReviewOpen(false);
-      setTimeline(await getTimeline(incidentId));
+      // The handoff has succeeded. A later timeline read failure must not
+      // tell the operator to resend an already accepted action.
+      try {
+        setTimeline(await getTimeline(incidentId));
+        setTimelineError(false);
+      } catch { setTimelineError(true); }
+      await reloadEvents();
     } catch (err) {
       setActionState("error");
       setActionError(err instanceof Error ? err.message : "Workflow request failed.");
@@ -123,12 +158,7 @@ export default function IncidentDetail({
     [timeline],
   );
 
-  const sameLocationEvents = useMemo(() => {
-    if (!incident) return [];
-    return events
-      .filter((e) => e.location === incident.location)
-      .slice(0, 8);
-  }, [events, incident]);
+  const sameLocationEvents = useMemo(() => events.slice(0, 8), [events]);
 
   const allowed = incident
     ? (ALLOWED_TRANSITIONS[incident.status as keyof typeof ALLOWED_TRANSITIONS] ?? [])
@@ -227,12 +257,12 @@ export default function IncidentDetail({
               <CardHeader className="px-6 pt-6 pb-0">
                 <CardTitle className="text-lg font-medium">Signals / evidence</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Recent events at {label(incident.location)} — same-location context, newest first.
+                  Events related to this incident, newest first.
                 </p>
               </CardHeader>
               <CardContent className="p-0 pt-2 pb-2">
-                {sameLocationEvents.length === 0 ? (
-                  <EmptyState title="No recent signals cached" hint="Open Signals / Events for the full backend event list." />
+                {eventsLoading ? <p className="px-6 py-8 text-sm text-muted-foreground">Loading related events…</p> : eventsError ? <p className="px-6 py-8 text-sm text-destructive" role="alert">Related events unavailable.</p> : sameLocationEvents.length === 0 ? (
+                  <EmptyState title="No related events" hint="The backend has not linked any evidence to this incident." />
                 ) : (
                   <ScrollArea className="max-h-72">
                     <Table>
@@ -240,19 +270,33 @@ export default function IncidentDetail({
                         <TableRow className="hover:bg-transparent">
                           <TableHead scope="col">Type</TableHead>
                           <TableHead scope="col">Source</TableHead>
+                          <TableHead scope="col">Detail</TableHead>
                           <TableHead scope="col" className="text-right">Time</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {sameLocationEvents.map((e) => (
-                          <TableRow key={e.id}>
-                            <TableCell><EventTypeBadge type={e.type} /></TableCell>
-                            <TableCell><SourceBadge source={e.source} /></TableCell>
-                            <TableCell className="text-right text-xs text-muted-foreground">
-                              {formatFullDateTime(e.timestamp)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {sameLocationEvents.map((e) => {
+                          const detail = evidenceDetail(e);
+                          return (
+                            <TableRow key={e.id}>
+                              <TableCell><EventTypeBadge type={e.type} /></TableCell>
+                              <TableCell><SourceBadge source={e.source} /></TableCell>
+                              <TableCell className="max-w-72">
+                                <p className="truncate text-xs text-muted-foreground" title={detail.text}>
+                                  {detail.text}
+                                </p>
+                                {detail.meta && (
+                                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground" title={detail.meta}>
+                                    {detail.meta}
+                                  </p>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right text-xs text-muted-foreground">
+                                {formatFullDateTime(e.timestamp)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </ScrollArea>
@@ -348,12 +392,14 @@ export default function IncidentDetail({
                   <div className="flex gap-2">
                     <Button
                       className="rounded-full font-medium"
-                      disabled={actionState === "sending" || !actionType.trim()}
+                      disabled={actionState === "sending" || !actionType.trim() || !integrations?.n8n.configured || !integrations.n8n.authenticated}
                       onClick={() => setReviewOpen(true)}
                     >
                       Review & approve
                     </Button>
                   </div>
+                  {integrationError && <p className="text-sm text-destructive" role="alert">Action readiness could not be checked.</p>}
+                  {!integrationError && integrations && (!integrations.n8n.configured || !integrations.n8n.authenticated) && <p className="text-sm text-warning-foreground" role="status">n8n action is not ready; no request can be sent.</p>}
                   {actionState === "accepted" && (
                     <p className="text-sm font-medium text-success" role="status">Workflow request accepted and recorded in the timeline.</p>
                   )}
@@ -388,11 +434,16 @@ export default function IncidentDetail({
                 This forwards a human-approved request to the n8n workflow. ShaktiOS never acts
                 autonomously — the timeline records this approval for audit.
               </p>
+              {actionState === "error" && actionError && (
+                <p className="text-sm font-medium text-destructive" role="alert">
+                  {actionError}
+                </p>
+              )}
               <div className="flex justify-end gap-2">
                 <Button variant="outline" className="rounded-full" onClick={() => setReviewOpen(false)}>
                   Cancel
                 </Button>
-                <Button className="rounded-full" disabled={actionState === "sending"} onClick={requestAction}>
+                <Button className="rounded-full" disabled={actionState === "sending" || !integrations?.n8n.configured || !integrations.n8n.authenticated} onClick={requestAction}>
                   {actionState === "sending" ? "Submitting…" : "Approve action"}
                 </Button>
               </div>

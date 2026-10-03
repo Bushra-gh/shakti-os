@@ -1,21 +1,20 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Command, Eye, EyeOff, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { saveAccessToken, supabase, supabaseConfigured } from "@/lib/supabase";
+import { getMe } from "@/lib/api";
+import { supabase, supabaseConfigured } from "@/lib/supabase";
 
 /**
  * Operator sign-in boundary.
  *
- * With NEXT_PUBLIC_SUPABASE_URL + publishable key configured, this signs in
- * through Supabase Auth and stores the session token, which the API verifies
- * (see services/api auth.py + GET /me). Without those keys it keeps the
- * previous demo behavior: session identity in localStorage only.
+ * Supabase Auth is the only sign-in path. The API's GET /me response is the
+ * authoritative operator allowlist check; a valid citizen session is not
+ * enough to enter the operator shell.
  */
 export default function LoginPage() {
   const router = useRouter();
@@ -32,48 +31,40 @@ export default function LoginPage() {
       setError("Enter a valid operator email address.");
       return;
     }
-    if (password.length < 4) {
-      setError("Enter your password (minimum 4 characters for this demo boundary).");
+    if (password.length < 1) {
+      setError("Enter your password.");
       return;
     }
     setLoading(true);
-    try {
-      if (supabaseConfigured) {
-        const client = supabase();
-        const { data, error: signInError } = await client!.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (signInError || !data.session) {
-          setError(signInError?.message ?? "Sign-in failed. Check your credentials.");
-          setLoading(false);
-          return;
-        }
-        saveAccessToken(data.session.access_token);
-        try {
-          localStorage.setItem("shaktios-operator-email", data.session.user.email ?? email.trim());
-          localStorage.setItem(
-            "shaktios-operator-name",
-            (data.session.user.email ?? email.trim()).split("@")[0] ?? "Operator",
-          );
-        } catch {
-          // Session identity is best-effort.
-        }
-      } else {
-        saveAccessToken(null);
-        try {
-          localStorage.setItem("shaktios-operator-email", email.trim());
-          localStorage.setItem("shaktios-operator-name", email.trim().split("@")[0] ?? "Operator");
-        } catch {
-          // Session identity is best-effort; the dashboard works without it.
-        }
-      }
-    } catch {
-      setError("Sign-in failed. Is the auth service reachable?");
+    if (!supabaseConfigured) {
+      setError("Operator sign-in is unavailable until Supabase Auth is configured.");
       setLoading(false);
       return;
     }
-    setTimeout(() => router.push("/dashboard"), 400);
+    try {
+      const client = supabase();
+      if (!client) throw new Error("Supabase Auth is not configured.");
+      const { data, error: signInError } = await client.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (signInError || !data.session) {
+        setError(signInError?.message ?? "Sign-in failed. Check your credentials.");
+        setLoading(false);
+        return;
+      }
+      const identity = await getMe();
+      if (!identity.is_operator) {
+        await client.auth.signOut();
+        setError("This account is not on the operator allowlist.");
+        setLoading(false);
+        return;
+      }
+      router.replace("/dashboard");
+    } catch {
+      setError("Sign-in failed. Check your credentials and the auth service.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -161,16 +152,10 @@ export default function LoginPage() {
             <div className="mt-5 flex items-start gap-2 rounded-2xl bg-muted p-3.5 text-xs leading-6 text-muted-foreground">
               <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
               <p>
-                {supabaseConfigured
-                  ? "Signed in through Supabase Auth — the API verifies this session (GET /me). Citizen clients use the same identity provider."
-                  : "Demo session boundary only — Supabase keys are not configured, so no real authentication happens yet. Citizen clients authenticate with Supabase Auth; operator SSO remains a backend/security gap."}
+                Supabase Auth verifies this session, then GET /me checks the server-side operator allowlist. No demo login or client-only identity is accepted.
               </p>
             </div>
-            <p className="mt-5 text-center text-xs text-muted-foreground">
-              <Link href="/dashboard" className="font-medium text-info hover:underline">
-                Continue to the command center →
-              </Link>
-            </p>
+
           </CardContent>
         </Card>
       </div>

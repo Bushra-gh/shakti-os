@@ -12,6 +12,9 @@ class IncidentConnectionManager:
 
     async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
+        await self.connect_after_accept(websocket)
+
+    async def connect_after_accept(self, websocket: WebSocket) -> None:
         self.connections.add(websocket)
 
     def disconnect(self, websocket: WebSocket) -> None:
@@ -38,6 +41,9 @@ class EventConnectionManager:
 
     async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
+        await self.connect_after_accept(websocket)
+
+    async def connect_after_accept(self, websocket: WebSocket) -> None:
         self.connections.add(websocket)
 
     def disconnect(self, websocket: WebSocket) -> None:

@@ -1,3 +1,5 @@
+import { accessToken } from "./supabase";
+
 export type Incident = {
   id: string;
   type: string;
@@ -9,6 +11,8 @@ export type Incident = {
   factors: Record<string, number>;
   created_at: string;
   updated_at: string;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 export type Event = {
@@ -19,6 +23,34 @@ export type Event = {
   location: string;
   confidence: number;
   payload: Record<string, unknown>;
+  incident_id: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+};
+
+export type PublicOverviewIncident = Pick<
+  Incident,
+  "id" | "type" | "location" | "status" | "severity" | "risk" | "updated_at" | "latitude" | "longitude"
+>;
+
+export type PublicOverviewEvent = {
+  id: string;
+  type: string;
+  source: string;
+  location: string;
+  timestamp: string;
+};
+
+export type PublicOverview = {
+  incident_count: number;
+  active_count: number;
+  elevated_count: number;
+  event_count: number;
+  source_count: number;
+  last_event_at: string | null;
+  incidents: PublicOverviewIncident[];
+  recent_events: PublicOverviewEvent[];
+  seeded_event_count: number;
 };
 
 export type TimelineEntry = {
@@ -29,17 +61,41 @@ export type TimelineEntry = {
   details: Record<string, string | number>;
 };
 
-export const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export type VenueZone = {
+  id: string;
+  label: string;
+  latitude: number;
+  longitude: number;
+};
 
-function authHeaders(): Record<string, string> {
-  try {
-    const token = localStorage.getItem("shaktios-access-token");
-    if (token) return { Authorization: `Bearer ${token}` };
-  } catch {
-    // Anonymous when no session is stored.
-  }
-  return {};
-}
+export type Venue = {
+  id: string;
+  name: string;
+  description: string;
+  venue: string;
+  locationLabel: string;
+  zones: VenueZone[];
+  status: string;
+  startTime: string | null;
+  endTime: string | null;
+  helpline: string | null;
+};
+
+export type Me = {
+  id: string;
+  email: string | null;
+  role: string;
+  is_operator: boolean;
+};
+
+export type Integrations = {
+  n8n: {
+    configured: boolean;
+    authenticated: boolean;
+  };
+};
+
+export const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export class ApiError extends Error {
   status: number;
@@ -69,23 +125,48 @@ export function websocketUrl(path: string): string {
   return `${apiUrl.replace(/^http/, "ws")}${path}`;
 }
 
-/** Same-origin fetch with the operator session token attached when signed in. */
-function apiFetch(url: string, init?: RequestInit): Promise<Response> {
-  return fetch(url, {
-    ...init,
-    headers: { ...authHeaders(), ...init?.headers },
-  });
+/** Authenticated API fetch using the current live Supabase session. */
+export async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
+  const token = await accessToken();
+  const headers = new Headers(init?.headers);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return fetch(url, { ...init, headers });
+}
+
+/** Public, sanitized landing-page overview. Never includes event payloads. */
+export async function getOverview(): Promise<PublicOverview> {
+  const response = await fetch(`${apiUrl}/public/overview`, { cache: "no-store" });
+  if (!response.ok) await throwForStatus(response, "Public overview request failed");
+  return response.json();
+}
+
+export async function getMe(): Promise<Me> {
+  const response = await apiFetch(`${apiUrl}/me`);
+  if (!response.ok) await throwForStatus(response, "Operator session request failed");
+  return response.json();
 }
 
 export async function getIncidents(): Promise<Incident[]> {
-  const response = await apiFetch(`${apiUrl}/incidents?limit=50`);
+  const response = await apiFetch(`${apiUrl}/incidents?limit=200`);
+  if (!response.ok) await throwForStatus(response, "Incident request failed");
+  return response.json();
+}
+
+export async function getIncident(incidentId: string): Promise<Incident> {
+  const response = await apiFetch(`${apiUrl}/incidents/${incidentId}`);
   if (!response.ok) await throwForStatus(response, "Incident request failed");
   return response.json();
 }
 
 export async function getEvents(): Promise<Event[]> {
-  const response = await apiFetch(`${apiUrl}/events?limit=50`);
+  const response = await apiFetch(`${apiUrl}/events?limit=200`);
   if (!response.ok) await throwForStatus(response, "Event request failed");
+  return response.json();
+}
+
+export async function getIncidentEvents(incidentId: string): Promise<Event[]> {
+  const response = await apiFetch(`${apiUrl}/incidents/${incidentId}/events`);
+  if (!response.ok) await throwForStatus(response, "Incident events request failed");
   return response.json();
 }
 
@@ -95,7 +176,21 @@ export async function getTimeline(incidentId: string): Promise<TimelineEntry[]> 
   return response.json();
 }
 
-export async function submitEvent(event: Omit<Event, "id" | "timestamp">): Promise<Event> {
+export async function getVenues(): Promise<Venue[]> {
+  const response = await apiFetch(`${apiUrl}/venues`);
+  if (!response.ok) await throwForStatus(response, "Venue request failed");
+  return response.json();
+}
+
+export async function getIntegrations(): Promise<Integrations> {
+  const response = await apiFetch(`${apiUrl}/integrations`);
+  if (!response.ok) await throwForStatus(response, "Integration request failed");
+  return response.json();
+}
+
+export async function submitEvent(
+  event: Omit<Event, "id" | "timestamp" | "incident_id">,
+): Promise<Event> {
   const response = await apiFetch(`${apiUrl}/events`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -115,7 +210,11 @@ export async function updateIncidentStatus(incidentId: string, status: string, n
   return response.json();
 }
 
-export async function requestIncidentAction(incidentId: string, type: string, note?: string): Promise<{ action_id: string; status: string; incident: Incident }> {
+export async function requestIncidentAction(
+  incidentId: string,
+  type: string,
+  note?: string,
+): Promise<{ action_id: string; status: string; incident: Incident }> {
   const response = await apiFetch(`${apiUrl}/incidents/${incidentId}/actions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

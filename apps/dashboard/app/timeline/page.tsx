@@ -21,7 +21,7 @@ const ENTRY_TYPES = [
 ];
 
 export default function TimelinePage() {
-  const { incidents, loading, error, refresh } = useShaktiData();
+  const { incidents, loading, error: dataError, refresh } = useShaktiData();
   const [incidentId, setIncidentId] = useState("all");
   const [entryType, setEntryType] = useState("all");
 
@@ -34,7 +34,9 @@ export default function TimelinePage() {
     return base.filter((e) => e.type === entryType);
   }, [incidentId, recent.entries, single.timeline, entryType]);
 
-  const busy = loading || (incidentId === "all" ? false : single.loading);
+  const busy = loading || (incidentId === "all" ? recent.loading : single.loading);
+  const error = dataError || (incidentId === "all" ? recent.error : single.error);
+  const retry = () => { refresh(); void single.reload(); };
 
   return (
     <OperatorShell>
@@ -42,7 +44,7 @@ export default function TimelinePage() {
         <div>
           <h1 className="text-2xl font-medium tracking-[-0.03em]">Incident Timeline</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Full audit history of detection, assessment, and action.
+            Audit history for the latest 15 incidents, refreshed every 15 seconds.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -84,14 +86,14 @@ export default function TimelinePage() {
         </CardHeader>
         <CardContent className="p-6">
           {busy && <TableSkeleton rows={6} />}
-          {!busy && (error || single.error) && <ErrorState onRetry={refresh} />}
-          {!busy && !error && !single.error && entries.length === 0 && (
+          {!busy && error && <ErrorState onRetry={retry} />}
+          {!busy && !error && entries.length === 0 && (
             <EmptyState
               title="No timeline entries"
               hint="Correlated events, status changes, operator notes, and approved actions are recorded here."
             />
           )}
-          {!busy && !error && !single.error && entries.length > 0 && (
+          {!busy && !error && entries.length > 0 && (
             <ScrollArea className="max-h-[70vh]">
               <div className="pr-4">
                 <TimelineView entries={entries} showIncidentLink={incidentId === "all"} />

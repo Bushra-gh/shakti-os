@@ -1,48 +1,44 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Incident, TimelineEntry } from "@/lib/api";
-import { getTimeline } from "@/lib/api";
+import { getTimeline, type Incident, type TimelineEntry } from "@/lib/api";
 
-/** Fetches timelines for the N most recently updated incidents. */
+/** Bounded audit history; polling also catches actions that do not update incident timestamps. */
 export function useRecentTimelines(incidents: Incident[], max = 15) {
   const [entries, setEntries] = useState<TimelineEntry[]>([]);
-  const [eventToIncident, setEventToIncident] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const targets = incidents.slice(0, max).map((incident) => incident.id).join("|");
+  const revisions = incidents.slice(0, max).map((incident) => incident.updated_at).join("|");
 
   useEffect(() => {
     let cancelled = false;
-    const targets = incidents.slice(0, max);
-    if (targets.length === 0) {
-      setEntries([]);
-      setEventToIncident({});
-      return;
-    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const ids = targets ? targets.split("|") : [];
     setLoading(true);
-    Promise.allSettled(targets.map((i) => getTimeline(i.id))).then((results) => {
-      if (cancelled) return;
-      const all: TimelineEntry[] = [];
-      const mapping: Record<string, string> = {};
-      for (const result of results) {
-        if (result.status !== "fulfilled") continue;
-        for (const entry of result.value) {
-          all.push(entry);
-          const eventId = entry.details.event_id;
-          if (typeof eventId === "string" && !(eventId in mapping)) {
-            mapping[eventId] = entry.incident_id;
-          }
+    setError(false);
+    const load = async () => {
+      try {
+        const timelines = await Promise.all(ids.map((id) => getTimeline(id)));
+        if (cancelled) return;
+        const unique = new Map(timelines.flat().map((entry) => [entry.id, entry]));
+        setEntries([...unique.values()].sort((a, b) => b.timestamp.localeCompare(a.timestamp)));
+        setError(false);
+      } catch {
+        if (!cancelled) setError(true);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          timer = setTimeout(load, 15_000);
         }
       }
-      all.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-      setEntries(all);
-      setEventToIncident(mapping);
-      setLoading(false);
-    });
+    };
+    void load();
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incidents.map((i) => `${i.id}:${i.updated_at}`).join("|")]);
+  }, [targets, revisions]);
 
-  return { entries, eventToIncident, loading };
+  return { entries, loading, error };
 }

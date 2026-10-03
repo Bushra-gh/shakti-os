@@ -36,6 +36,8 @@ class Incident(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     type: str = Field(min_length=1)
     location: str = Field(min_length=1)
+    latitude: float | None = None
+    longitude: float | None = None
     status: IncidentStatus = IncidentStatus.DETECTED
     severity: IncidentSeverity = IncidentSeverity.MEDIUM
     confidence: float = Field(ge=0.0, le=1.0)

@@ -13,8 +13,9 @@ import { useRecentTimelines } from "@/hooks/use-timelines";
 import { formatFullDateTime, label } from "@/lib/format";
 
 export default function ActionsPage() {
-  const { incidents, loading, error, refresh } = useShaktiData();
-  const { entries, loading: timelinesLoading } = useRecentTimelines(incidents, 15);
+  const { incidents, loading, error: dataError, refresh } = useShaktiData();
+  const { entries, loading: timelinesLoading, error: timelineError } = useRecentTimelines(incidents, 15);
+  const error = dataError || timelineError;
 
   const actions = useMemo(
     () => entries.filter((e) => e.type === "action.requested"),

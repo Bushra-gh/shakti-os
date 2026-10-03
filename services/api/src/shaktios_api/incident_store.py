@@ -15,6 +15,7 @@ from shaktios_api.incident_models import (
 from shaktios_api.models import Event
 from shaktios_api.risk import calculate_risk
 from shaktios_api.timeline_store import add_timeline_entry
+from shaktios_api.venue_store import zone_coordinates
 
 RELEVANT_EVENT_TYPES = {
     "crowd_density",
@@ -35,6 +36,8 @@ class IncidentRecord(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     type: Mapped[str] = mapped_column(String(255), nullable=False)
     location: Mapped[str] = mapped_column(String(255), nullable=False)
+    latitude: Mapped[float | None] = mapped_column(nullable=True)
+    longitude: Mapped[float | None] = mapped_column(nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     severity: Mapped[str] = mapped_column(String(32), nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
@@ -66,11 +69,14 @@ def correlate_event(db: Session, event: Event, event_record: EventRecord) -> Inc
         .first()
     )
 
+    coordinates = zone_coordinates(db, event.location)
     if incident is None:
         incident = IncidentRecord(
             id=str(uuid4()),
             type="crowd_risk",
             location=event.location,
+            latitude=coordinates[0] if coordinates else None,
+            longitude=coordinates[1] if coordinates else None,
             status=IncidentStatus.DETECTED.value,
             severity=IncidentSeverity.MEDIUM.value,
             confidence=event.confidence,
@@ -89,6 +95,8 @@ def correlate_event(db: Session, event: Event, event_record: EventRecord) -> Inc
     else:
         incident.updated_at = max(incident.updated_at, event.timestamp)
         incident.confidence = max(incident.confidence, event.confidence)
+        if coordinates:
+            incident.latitude, incident.longitude = coordinates
 
     incident.risk, severity, incident.factors = calculate_risk(incident.factors, event)
     incident.severity = severity.value

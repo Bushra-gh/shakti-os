@@ -74,7 +74,7 @@ export const FACTOR_LABELS: Record<string, string> = {
 };
 
 const SOURCE_META: Record<string, { name: string; kind: string }> = {
-  crowd_simulator: { name: "Crowd Simulator", kind: "Physical sensor" },
+  crowd_simulator: { name: "Crowd Simulator", kind: "Generated simulation" },
   iot_sensor: { name: "IoT Crowd Sensor", kind: "Physical sensor" },
   camera_analytics: { name: "Camera Analytics", kind: "Physical sensor" },
   civic_shield: { name: "Social Intelligence", kind: "Civic-Shield boundary" },
@@ -82,7 +82,7 @@ const SOURCE_META: Record<string, { name: string; kind: string }> = {
   citizen_report: { name: "Citizen Report", kind: "Citizen mobile app" },
   public_app: { name: "Citizen Report", kind: "Citizen mobile app" },
   expo_app: { name: "Citizen Report", kind: "Citizen mobile app" },
-  dashboard_demo: { name: "Operator Test Signal", kind: "Dashboard" },
+  dashboard_observation: { name: "Operator observation", kind: "Authenticated operator" },
 };
 
 export function sourceMeta(source: string) {

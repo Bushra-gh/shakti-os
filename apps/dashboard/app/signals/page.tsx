@@ -16,7 +16,6 @@ import { EventTypeBadge, SourceBadge } from "@/components/dashboard/badges";
 import { SignalDialog } from "@/components/dashboard/signal-dialog";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/dashboard/states";
 import { useShaktiData } from "@/hooks/use-shakti";
-import { useRecentTimelines } from "@/hooks/use-timelines";
 import { EVENT_TYPES, formatFullDateTime, label } from "@/lib/format";
 import type { Event } from "@/lib/api";
 
@@ -27,8 +26,7 @@ function payloadSummary(payload: Record<string, unknown>) {
 }
 
 export default function SignalsPage() {
-  const { incidents, events, loading, error, refresh, prependEvent } = useShaktiData();
-  const { eventToIncident } = useRecentTimelines(incidents, 15);
+  const { events, venues, loading, error, refresh, prependEvent } = useShaktiData();
   const [query, setQuery] = useState("");
   const [type, setType] = useState("all");
   const [source, setSource] = useState("all");
@@ -63,7 +61,7 @@ export default function SignalsPage() {
             <RefreshCw className="size-3.5" aria-hidden />
             Refresh
           </Button>
-          <SignalDialog onCreated={prependEvent} />
+          <SignalDialog onCreated={prependEvent} venues={venues} />
         </div>
       </div>
 
@@ -160,15 +158,15 @@ export default function SignalsPage() {
                         {Math.round(item.confidence * 100)}%
                       </TableCell>
                       <TableCell>
-                        {eventToIncident[item.id] ? (
+                        {item.incident_id ? (
                           <Link
-                            href={`/incidents/${eventToIncident[item.id]}`}
+                            href={`/incidents/${item.incident_id}`}
                             className="text-xs font-medium text-info hover:underline"
                           >
                             Open →
                           </Link>
                         ) : (
-                          <span className="text-xs text-muted-foreground" title="Seen only in the latest retained events; correlation resolves as timelines load.">—</span>
+                          <span className="text-xs text-muted-foreground">Not correlated</span>
                         )}
                       </TableCell>
                       <TableCell className="max-w-64 truncate text-xs text-muted-foreground">
@@ -199,7 +197,7 @@ export default function SignalsPage() {
                   ["Source", detail.source],
                   ["Location", label(detail.location)],
                   ["Confidence", `${Math.round(detail.confidence * 100)}%`],
-                  ["Linked incident", eventToIncident[detail.id] ?? "Not yet correlated"],
+                  ["Linked incident", detail.incident_id ?? "Not yet correlated"],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between gap-4">
                     <dt className="shrink-0 text-muted-foreground">{k}</dt>

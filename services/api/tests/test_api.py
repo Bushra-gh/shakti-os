@@ -10,18 +10,47 @@ from shaktios_api.database import SessionLocal
 from shaktios_api.event_store import EventRecord
 from shaktios_api.incident_store import IncidentRecord
 from shaktios_api.timeline_store import TimelineEntryRecord
+from shaktios_api.auth import AuthUser, get_operator_user
+import shaktios_api.main as main_module
 from shaktios_api.main import app
+from shaktios_api.venue_store import VenueRecord, VenueZoneRecord
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    monkeypatch.setattr(
+        main_module,
+        "verify_token",
+        lambda token: AuthUser(id="operator-test", email="operator@example.com", role="operator"),
+    )
+    app.dependency_overrides[get_operator_user] = lambda: AuthUser(
+        id="operator-test", email="operator@example.com", role="operator"
+    )
     with TestClient(app) as test_client:
         with SessionLocal() as db:
             db.query(EventRecord).delete()
             db.query(IncidentRecord).delete()
             db.query(TimelineEntryRecord).delete()
+            db.query(VenueZoneRecord).delete()
+            db.query(VenueRecord).delete()
+            db.add(VenueRecord(
+                id="venue-test",
+                name="Test Venue",
+                description="Test venue",
+                venue="Test venue",
+                location_label="Gate 4",
+                status="active",
+            ))
+            db.add(VenueZoneRecord(
+                id="gate_4",
+                venue_id="venue-test",
+                label="Gate 4",
+                latitude=23.3441,
+                longitude=85.3096,
+            ))
             db.commit()
         yield test_client
+    app.dependency_overrides.pop(get_operator_user, None)
 
 
 def event_payload(
@@ -46,6 +75,17 @@ def test_health(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "service": "shaktios-api"}
+
+
+def test_public_venues_and_overview_are_real_backend_data(client: TestClient) -> None:
+    venues = client.get("/venues")
+    overview = client.get("/public/overview")
+
+    assert venues.status_code == 200
+    assert venues.json()[0]["zones"]
+    assert overview.status_code == 200
+    assert "recent_events" in overview.json()
+    assert "payload" not in overview.json()["recent_events"][0] if overview.json()["recent_events"] else True
 
 
 def test_event_is_persisted(client: TestClient) -> None:
@@ -83,6 +123,8 @@ def test_event_creates_incident(client: TestClient) -> None:
 
 def test_incident_websocket_receives_created_incident(client: TestClient) -> None:
     with client.websocket_connect("/ws/incidents") as websocket:
+        websocket.send_json({"type": "authenticate", "token": "test-operator-token"})
+        assert websocket.receive_json() == {"type": "authenticated"}
         response = client.post(
             "/events",
             json=event_payload(timestamp="2026-09-19T12:00:00Z"),
@@ -98,6 +140,8 @@ def test_incident_websocket_receives_created_incident(client: TestClient) -> Non
 
 def test_event_websocket_receives_persisted_event(client: TestClient) -> None:
     with client.websocket_connect("/ws/events") as websocket:
+        websocket.send_json({"type": "authenticate", "token": "test-operator-token"})
+        assert websocket.receive_json() == {"type": "authenticated"}
         response = client.post(
             "/events",
             json=event_payload(timestamp="2026-09-19T12:00:00Z"),
@@ -113,6 +157,8 @@ def test_event_websocket_receives_persisted_event(client: TestClient) -> None:
 
 def test_incident_websocket_receives_updates_to_existing_incident(client: TestClient) -> None:
     with client.websocket_connect("/ws/incidents") as websocket:
+        websocket.send_json({"type": "authenticate", "token": "test-operator-token"})
+        assert websocket.receive_json() == {"type": "authenticated"}
         client.post(
             "/events",
             json=event_payload(timestamp="2026-09-19T12:00:00Z"),
@@ -271,6 +317,8 @@ def test_operator_can_advance_incident_status_and_records_decision(client: TestC
         "from_status": "DETECTED",
         "to_status": "ASSESSING",
         "note": "Operator is reviewing evidence.",
+        "operator_id": "operator-test",
+        "operator_email": "operator@example.com",
     }
 
 
@@ -310,7 +358,10 @@ def test_action_requires_responding_incident(client: TestClient, monkeypatch: py
     assert response.status_code == 409
 
 
-def test_action_requires_webhook_configuration(client: TestClient) -> None:
+def test_action_requires_webhook_configuration(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("N8N_WEBHOOK_URL", raising=False)
     incident = prepare_responding_incident(client)
 
     response = client.post(f"/incidents/{incident['id']}/actions", json={"type": "notify_operator"})
@@ -323,6 +374,7 @@ def test_action_posts_to_n8n_and_records_timeline(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("N8N_WEBHOOK_URL", "http://n8n.test/webhook")
+    monkeypatch.setenv("N8N_WEBHOOK_SECRET", "demo-shared-secret")
     incident = prepare_responding_incident(client)
     response_mock = MagicMock()
     response_mock.raise_for_status.return_value = None
@@ -337,6 +389,9 @@ def test_action_posts_to_n8n_and_records_timeline(
 
     assert response.status_code == 200
     assert response.json()["status"] == "accepted"
+    client_mock.__aenter__.return_value.post.assert_awaited_once()
+    request_kwargs = client_mock.__aenter__.return_value.post.await_args.kwargs
+    assert request_kwargs["headers"]["X-ShaktiOS-Webhook-Secret"] == "demo-shared-secret"
     timeline = client.get(f"/incidents/{incident['id']}/timeline").json()
     assert timeline[-1]["type"] == "action.requested"
     assert timeline[-1]["details"]["action_type"] == "notify_operator"

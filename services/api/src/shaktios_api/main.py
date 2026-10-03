@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -7,17 +8,22 @@ from uuid import uuid4
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from shaktios_api.auth import AuthUser, get_current_user, get_optional_user
+from shaktios_api.auth import AuthUser, AuthError, get_current_user, get_operator_user, get_optional_user, is_operator, verify_token
 from shaktios_api.database import create_tables, get_db
 from shaktios_api.event_store import EventRecord, list_events, save_event
 from shaktios_api.incident_models import ActionDelivery, Incident, IncidentAction, IncidentStatus, IncidentStatusUpdate
 from shaktios_api.incident_store import IncidentRecord, correlate_event, get_incident, list_incidents
 from shaktios_api.models import Event
+from shaktios_api.report_models import ReportEvent
+from shaktios_api.report_store import get_my_report, list_my_reports
 from shaktios_api.realtime import event_connections, incident_connections
 from shaktios_api.timeline_models import TimelineEntry
 from shaktios_api.timeline_store import add_timeline_entry, list_timeline_entries
+from shaktios_api.venue_models import Venue
+from shaktios_api.venue_store import get_venue, list_venues
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +57,9 @@ def health() -> dict[str, str]:
 
 
 @app.get("/me")
-def me(user: AuthUser = Depends(get_current_user)) -> dict[str, str | None]:
-    """Return the verified Supabase identity (auth check for clients)."""
-    return {"id": user.id, "email": user.email, "role": user.role}
+def me(user: AuthUser = Depends(get_current_user)) -> dict[str, str | bool | None]:
+    """Return the verified Supabase identity and operator capability."""
+    return {"id": user.id, "email": user.email, "role": user.role, "is_operator": is_operator(user)}
 
 
 # Client-supplied identity keys are never trusted. They are stripped from
@@ -67,30 +73,62 @@ async def ingest_event(
     db: Session = Depends(get_db),
     user: AuthUser | None = Depends(get_optional_user),
 ) -> Event:
+    if event.source.startswith("dashboard") and (user is None or not is_operator(user)):
+        raise HTTPException(status_code=403, detail="Operator access required")
     if event.type == "citizen_report":
+        if user is None:
+            raise HTTPException(status_code=401, detail="Authentication required for citizen reports")
+        venue_id = event.payload.get("venue_event_id")
+        if not isinstance(venue_id, str) or not venue_id:
+            raise HTTPException(status_code=422, detail="venue_event_id is required for citizen reports")
+        venue = get_venue(db, venue_id)
+        if venue is None or event.location not in {zone.id for zone in venue.zones}:
+            raise HTTPException(status_code=422, detail="Report location must be a zone in the selected venue")
         sanitized = {k: v for k, v in event.payload.items() if k not in _UNTRUSTED_IDENTITY_KEYS}
         event.payload = sanitized
-        # Server-authoritative attribution: verified JWT sub or anonymous.
-        event.reporter_id = user.id if user is not None else None
+        # Server-authoritative attribution from the verified JWT subject.
+        event.reporter_id = user.id
     else:
         event.reporter_id = None
+    # Correlation is server-owned; a client cannot link to a chosen incident.
+    event.incident_id = None
+    if db.get(EventRecord, event.id) is not None:
+        raise HTTPException(status_code=409, detail="Event ID already exists")
     persisted_event = save_event(db, event)
     event_record = db.get(EventRecord, persisted_event.id)
     incident = None
     if event_record is not None:
         incident = correlate_event(db, persisted_event, event_record)
     if incident is not None:
+        persisted_event.incident_id = incident.id
         await incident_connections.broadcast(incident)
     await event_connections.broadcast(persisted_event)
-    normalized_event = persisted_event.model_dump(mode="json")
-    logger.info("event_received", extra={"event": normalized_event})
+    logger.info("event_received", extra={"event_id": persisted_event.id, "event_type": persisted_event.type})
     return persisted_event
+
+
+async def authenticate_websocket(websocket: WebSocket) -> AuthUser:
+    await websocket.accept()
+    try:
+        message = await asyncio.wait_for(websocket.receive_json(), timeout=5)
+        token = message.get("token") if isinstance(message, dict) and message.get("type") == "authenticate" else None
+        if not isinstance(token, str) or not token:
+            raise AuthError("WebSocket authentication required")
+        user = verify_token(token)
+        if not is_operator(user):
+            raise HTTPException(status_code=403, detail="Operator access required")
+        return user
+    except (asyncio.TimeoutError, AuthError, HTTPException, ValueError, TypeError) as error:
+        await websocket.close(code=1008, reason="Authentication required")
+        raise WebSocketDisconnect(code=1008) from error
 
 
 @app.websocket("/ws/incidents")
 async def incident_updates(websocket: WebSocket) -> None:
-    await incident_connections.connect(websocket)
     try:
+        await authenticate_websocket(websocket)
+        await incident_connections.connect_after_accept(websocket)
+        await websocket.send_json({"type": "authenticated"})
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
@@ -99,32 +137,131 @@ async def incident_updates(websocket: WebSocket) -> None:
 
 @app.websocket("/ws/events")
 async def event_updates(websocket: WebSocket) -> None:
-    await event_connections.connect(websocket)
     try:
+        await authenticate_websocket(websocket)
+        await event_connections.connect_after_accept(websocket)
+        await websocket.send_json({"type": "authenticated"})
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
         event_connections.disconnect(websocket)
 
 
+@app.get("/venues", response_model=list[Venue])
+def get_venues(db: Session = Depends(get_db)) -> list[Venue]:
+    return list_venues(db)
+
+
+@app.get("/venues/{venue_id}", response_model=Venue)
+def get_venue_by_id(venue_id: str, db: Session = Depends(get_db)) -> Venue:
+    venue = get_venue(db, venue_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+    return venue
+
+
+@app.get("/me/reports", response_model=list[ReportEvent])
+def get_my_reports(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user: AuthUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[ReportEvent]:
+    return list_my_reports(db, user.id, limit, offset)
+
+
+@app.get("/me/reports/{report_id}", response_model=ReportEvent)
+def get_my_report_by_id(
+    report_id: str,
+    user: AuthUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ReportEvent:
+    report = get_my_report(db, user.id, report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report
+
+
+@app.get("/incidents/{incident_id}/events", response_model=list[Event])
+def get_incident_events(
+    incident_id: str,
+    limit: int = Query(default=100, ge=1, le=200),
+    _: AuthUser = Depends(get_operator_user),
+    db: Session = Depends(get_db),
+) -> list[Event]:
+    if get_incident(db, incident_id) is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    records = (
+        db.query(EventRecord)
+        .filter(EventRecord.incident_id == incident_id)
+        .order_by(EventRecord.timestamp.asc(), EventRecord.id.asc())
+        .limit(limit)
+        .all()
+    )
+    return [Event.model_validate(record, from_attributes=True) for record in records]
+
+
+@app.get("/public/overview")
+def public_overview(db: Session = Depends(get_db)) -> dict[str, object]:
+    incidents = list_incidents(db, 100)
+    events = list_events(db, 100)
+    active = db.query(IncidentRecord).filter(IncidentRecord.status != IncidentStatus.RESOLVED.value)
+    return {
+        "incident_count": db.query(IncidentRecord).count(),
+        "active_count": active.count(),
+        "elevated_count": active.filter(IncidentRecord.severity.in_(["HIGH", "CRITICAL"])).count(),
+        "event_count": db.query(EventRecord).count(),
+        "source_count": db.query(func.count(func.distinct(EventRecord.source))).scalar(),
+        "last_event_at": events[0].timestamp if events else None,
+        "incidents": [
+            item.model_dump(include={"id", "type", "location", "status", "severity", "risk", "updated_at", "latitude", "longitude"})
+            for item in incidents
+        ],
+        "recent_events": [
+            {
+                "id": event.id,
+                "type": event.type,
+                "source": event.source,
+                "location": event.location,
+                "timestamp": event.timestamp,
+            }
+            for event in events[:12]
+        ],
+        "seeded_event_count": db.query(EventRecord).filter(EventRecord.source.startswith("seed_")).count(),
+    }
+
+
+@app.get("/integrations")
+def integrations(_: AuthUser = Depends(get_operator_user)) -> dict[str, dict[str, bool]]:
+    webhook_url = os.getenv("N8N_WEBHOOK_URL", "").strip()
+    secret = os.getenv("N8N_WEBHOOK_SECRET", "").strip()
+    return {"n8n": {"configured": bool(webhook_url), "authenticated": bool(webhook_url and secret)}}
+
+
 @app.get("/events", response_model=list[Event])
 def get_events(
-    limit: int = Query(default=50, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
+    _: AuthUser = Depends(get_operator_user),
 ) -> list[Event]:
     return list_events(db, limit)
 
 
 @app.get("/incidents", response_model=list[Incident])
 def get_incidents(
-    limit: int = Query(default=50, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
+    _: AuthUser = Depends(get_operator_user),
 ) -> list[Incident]:
     return list_incidents(db, limit)
 
 
 @app.get("/incidents/{incident_id}", response_model=Incident)
-def get_incident_by_id(incident_id: str, db: Session = Depends(get_db)) -> Incident:
+def get_incident_by_id(
+    incident_id: str,
+    db: Session = Depends(get_db),
+    _: AuthUser = Depends(get_operator_user),
+) -> Incident:
     incident = get_incident(db, incident_id)
     if incident is None:
         raise HTTPException(status_code=404, detail="Incident not found")
@@ -136,6 +273,7 @@ def get_incident_timeline(
     incident_id: str,
     limit: int = Query(default=100, ge=1),
     db: Session = Depends(get_db),
+    _: AuthUser = Depends(get_operator_user),
 ) -> list[TimelineEntry]:
     if get_incident(db, incident_id) is None:
         raise HTTPException(status_code=404, detail="Incident not found")
@@ -155,6 +293,7 @@ async def update_incident_status(
     incident_id: str,
     update: IncidentStatusUpdate,
     db: Session = Depends(get_db),
+    operator: AuthUser = Depends(get_operator_user),
 ) -> Incident:
     record = db.get(IncidentRecord, incident_id)
     if record is None:
@@ -175,6 +314,9 @@ async def update_incident_status(
     }
     if update.note:
         details["note"] = update.note
+    details["operator_id"] = operator.id
+    if operator.email:
+        details["operator_email"] = operator.email
     add_timeline_entry(
         db,
         incident_id,
@@ -196,6 +338,7 @@ async def request_incident_action(
     incident_id: str,
     action: IncidentAction,
     db: Session = Depends(get_db),
+    operator: AuthUser = Depends(get_operator_user),
 ) -> ActionDelivery:
     record = db.get(IncidentRecord, incident_id)
     if record is None:
@@ -205,7 +348,13 @@ async def request_incident_action(
 
     webhook_url = os.getenv("N8N_WEBHOOK_URL", "").strip()
     if not webhook_url:
-        raise HTTPException(status_code=503, detail="N8N_WEBHOOK_URL is not configured")
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "N8N_WEBHOOK_URL is not configured. Start FastAPI with "
+                "--env-file ../../.env or export the variable in the API process."
+            ),
+        )
 
     action_id = str(uuid4())
     incident = get_incident(db, incident_id)
@@ -217,21 +366,84 @@ async def request_incident_action(
         "note": action.note,
         "incident": incident.model_dump(mode="json"),
     }
+    webhook_headers = {"Content-Type": "application/json"}
+    webhook_secret = os.getenv("N8N_WEBHOOK_SECRET", "").strip()
+    if webhook_secret:
+        webhook_headers["X-ShaktiOS-Webhook-Secret"] = webhook_secret
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(webhook_url, json=payload)
+            response = await client.post(webhook_url, json=payload, headers=webhook_headers)
             response.raise_for_status()
+            try:
+                webhook_result = response.json()
+            except ValueError:
+                webhook_result = None
+            if isinstance(webhook_result, dict) and webhook_result.get("ok") is False:
+                raise HTTPException(status_code=502, detail="Action webhook rejected the payload")
+    except HTTPException:
+        raise
     except httpx.HTTPError as error:
-        logger.warning("action_webhook_failed", extra={"incident_id": incident_id, "error": str(error)})
-        raise HTTPException(status_code=502, detail="Action webhook delivery failed") from error
+        upstream_status = None
+        if isinstance(error, httpx.HTTPStatusError):
+            upstream_status = error.response.status_code
+            if upstream_status in {401, 403}:
+                detail = (
+                    f"n8n rejected webhook access (HTTP {upstream_status}). Check the Webhook node's "
+                    "Header Auth credential: X-ShaktiOS-Webhook-Secret must match N8N_WEBHOOK_SECRET. "
+                    "Also check n8n access restrictions. Restart FastAPI after changing its secret."
+                )
+            elif upstream_status == 404:
+                detail = (
+                    "n8n webhook was not found (HTTP 404). Activate/publish the workflow and copy "
+                    "the Webhook node's Production URL into N8N_WEBHOOK_URL, then restart FastAPI."
+                )
+            elif upstream_status == 405:
+                detail = "n8n rejected the request method (HTTP 405). Set the Webhook node's HTTP Method to POST."
+            elif upstream_status == 429:
+                detail = (
+                    "n8n returned a rate limit error (HTTP 429). Check n8n Executions before retrying, "
+                    "and wait for the rate limit to clear."
+                )
+            else:
+                detail = (
+                    f"n8n returned HTTP {upstream_status}. Check the workflow's Executions and "
+                    "Webhook response configuration before retrying; an execution may already have started."
+                )
+        elif isinstance(error, httpx.TimeoutException):
+            detail = (
+                "The n8n webhook timed out after 10 seconds. Check n8n Executions before retrying: "
+                "the workflow may already have executed even though FastAPI received no acknowledgement."
+            )
+        elif isinstance(error, httpx.ConnectError):
+            detail = (
+                "FastAPI could not connect to n8n. Check N8N_WEBHOOK_URL, n8n availability, "
+                "and network/TLS configuration."
+            )
+        else:
+            detail = (
+                "A network error interrupted the n8n acknowledgement. Check n8n Executions before retrying: "
+                "the workflow may already have executed."
+            )
+        # Exception strings and upstream bodies may contain webhook URLs,
+        # credentials or private payloads. Log only safe diagnostic fields.
+        logger.warning(
+            "action_webhook_failed: kind=%s upstream_status=%s",
+            type(error).__name__, upstream_status,
+            extra={"incident_id": incident_id},
+        )
+        raise HTTPException(status_code=502, detail=detail) from None
 
     details: dict[str, object] = {
         "action_id": action_id,
         "action_type": action.type,
         "delivery": "accepted",
+        "operator_id": operator.id,
     }
+    if operator.email:
+        details["operator_email"] = operator.email
     if action.note:
         details["note"] = action.note
     add_timeline_entry(db, incident_id, "action.requested", datetime.now(timezone.utc), details)
     db.commit()
+    await incident_connections.broadcast(incident)
     return ActionDelivery(action_id=action_id, status="accepted", incident=incident)

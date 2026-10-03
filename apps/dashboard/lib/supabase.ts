@@ -6,35 +6,28 @@ const supabaseKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
   "";
 
-/** True when the operator login can use real Supabase Auth. */
+/** True when the dashboard can use the real Supabase Auth session. */
 export const supabaseConfigured = supabaseUrl.length > 0 && supabaseKey.length > 0;
 
 let client: SupabaseClient | null = null;
 
-/** Supabase Auth client, or null when keys are not configured (demo fallback applies). */
 export function supabase(): SupabaseClient | null {
   if (!supabaseConfigured) return null;
   client ??= createClient(supabaseUrl, supabaseKey);
   return client;
 }
 
-const TOKEN_KEY = "shaktios-access-token";
-
-/** Persist the operator session token attached to API calls. Best-effort. */
-export function saveAccessToken(token: string | null) {
-  try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
-  } catch {
-    // Session token is best-effort; the dashboard works without it.
-  }
-}
-
-/** Operator session token for the Authorization header, if signed in. */
-export function accessToken(): string | null {
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
+/**
+ * Read the current access token from the live Supabase session.
+ *
+ * The API and WebSocket clients deliberately do not maintain a second token
+ * cache. Supabase owns session persistence and refresh, so every request uses
+ * the session that Auth currently considers valid.
+ */
+export async function accessToken(): Promise<string | null> {
+  const client = supabase();
+  if (!client) return null;
+  const { data, error } = await client.auth.getSession();
+  if (error) throw error;
+  return data.session?.access_token ?? null;
 }

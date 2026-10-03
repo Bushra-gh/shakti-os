@@ -674,7 +674,7 @@ pnpm install
 ```powershell
 cd services/api
 .\.venv\Scripts\python.exe -m shaktios_api.migrate
-.\.venv\Scripts\python.exe -m uvicorn shaktios_api.main:app --app-dir src --reload --port 8000
+.\.venv\Scripts\python.exe -m uvicorn shaktios_api.main:app --app-dir src --env-file ../../.env --reload --port 8000
 ```
 
 ### Start the dashboard

@@ -1,0 +1,65 @@
+{
+  "name": "ShaktiOS - Human Approved Action Handoff",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "shaktios/action",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "id": "shaktios-webhook",
+      "name": "ShaktiOS Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "shaktios-action-handoff",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "configure-in-n8n",
+          "name": "ShaktiOS Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json.body ?? $json;\n\nif (!input.action_id || !input.action_type || !input.incident?.id) {\n  return [{\n    json: {\n      ok: false,\n      error: 'Invalid ShaktiOS action payload',\n      received_at: new Date().toISOString(),\n    },\n  }];\n}\n\nreturn [{\n  json: {\n    ok: true,\n    status: 'accepted',\n    action_id: input.action_id,\n    action_type: input.action_type,\n    incident_id: input.incident.id,\n    incident_location: input.incident.location,\n    incident_severity: input.incident.severity,\n    note: input.note ?? null,\n    received_at: new Date().toISOString(),\n    message: 'Human-approved action received by n8n. Connect your notification node after this step.',\n  },\n}];"
+      },
+      "id": "validate-action",
+      "name": "Validate Approved Action",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond-to-api",
+      "name": "Respond to ShaktiOS",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [780, 300]
+    }
+  ],
+  "connections": {
+    "ShaktiOS Webhook": {
+      "main": [[{"node": "Validate Approved Action", "type": "main", "index": 0}]]
+    },
+    "Validate Approved Action": {
+      "main": [[{"node": "Respond to ShaktiOS", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "shaktios-action-handoff-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

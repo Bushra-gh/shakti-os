@@ -15,6 +15,7 @@ class Event(BaseModel):
     location: str = Field(min_length=1)
     confidence: float = Field(ge=0.0, le=1.0)
     payload: dict[str, Any]
+    incident_id: str | None = None
     # Verified Supabase Auth user id (JWT sub) that submitted a
     # citizen_report. Set server-side only — never from client input.
     # None for anonymous reports and machine signal sources.

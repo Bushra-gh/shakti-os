@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { OperatorSessionBoundary } from "@/components/dashboard/operator-session";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -29,7 +30,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} bg-background font-sans font-light text-foreground antialiased`}
         suppressHydrationWarning
       >
-        {children}
+        <OperatorSessionBoundary>{children}</OperatorSessionBoundary>
       </body>
     </html>
   );

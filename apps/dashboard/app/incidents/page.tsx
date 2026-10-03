@@ -14,28 +14,24 @@ import { SeverityBadge, StatusBadge } from "@/components/dashboard/badges";
 import { SignalDialog } from "@/components/dashboard/signal-dialog";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/dashboard/states";
 import { useShaktiData } from "@/hooks/use-shakti";
-import { useRecentTimelines } from "@/hooks/use-timelines";
 import { formatDateTime, label, riskPercent, SEVERITIES, STATUSES } from "@/lib/format";
 
 type SortKey = "updated" | "risk" | "created";
 
 export default function IncidentsPage() {
-  const { incidents, loading, error, refresh, prependEvent } = useShaktiData();
+  const { incidents, events, venues, loading, error, refresh, prependEvent } = useShaktiData();
   const [query, setQuery] = useState("");
   const [severity, setSeverity] = useState("all");
   const [status, setStatus] = useState("all");
   const [location, setLocation] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("updated");
-  const { entries: recentEntries } = useRecentTimelines(incidents, 30);
-
   const signalCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const entry of recentEntries) {
-      if (entry.type !== "event.correlated") continue;
-      counts.set(entry.incident_id, (counts.get(entry.incident_id) ?? 0) + 1);
+    for (const event of events) {
+      if (event.incident_id) counts.set(event.incident_id, (counts.get(event.incident_id) ?? 0) + 1);
     }
     return counts;
-  }, [recentEntries]);
+  }, [events]);
 
   const locations = useMemo(
     () => Array.from(new Set(incidents.map((i) => i.location))).sort(),
@@ -73,7 +69,7 @@ export default function IncidentsPage() {
             <RefreshCw className="size-3.5" aria-hidden />
             Refresh
           </Button>
-          <SignalDialog onCreated={prependEvent} />
+          <SignalDialog onCreated={prependEvent} venues={venues} />
         </div>
       </div>
 

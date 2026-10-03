@@ -12,12 +12,10 @@ import { OperatorShell } from "@/components/dashboard/shell";
 import { SourceBadge } from "@/components/dashboard/badges";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/dashboard/states";
 import { useShaktiData } from "@/hooks/use-shakti";
-import { useRecentTimelines } from "@/hooks/use-timelines";
 import { formatFullDateTime, label } from "@/lib/format";
 
 export default function ReportsPage() {
-  const { incidents, events, loading, error, refresh } = useShaktiData();
-  const { eventToIncident } = useRecentTimelines(incidents, 15);
+  const { events, loading, error, refresh } = useShaktiData();
   const [source, setSource] = useState("all");
 
   const evidence = useMemo(() => events.filter((e) => e.type === "citizen_report"), [events]);
@@ -37,7 +35,7 @@ export default function ReportsPage() {
         e.source,
         e.location,
         String(e.confidence),
-        eventToIncident[e.id] ?? "",
+        e.incident_id ?? "",
         JSON.stringify(e.payload).replaceAll('"', '""'),
       ]);
     }
@@ -122,7 +120,7 @@ export default function ReportsPage() {
                 </TableHeader>
                 <TableBody>
                   {filtered.map((e) => {
-                    const linked = eventToIncident[e.id];
+                    const linked = e.incident_id;
                     const description =
                       typeof e.payload.description === "string"
                         ? e.payload.description

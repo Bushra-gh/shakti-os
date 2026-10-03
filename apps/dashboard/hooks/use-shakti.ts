@@ -1,21 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  apiUrl,
   getEvents,
+  getIncidentEvents,
   getIncidents,
   getTimeline,
+  getVenues,
   websocketUrl,
   type Event,
   type Incident,
   type TimelineEntry,
+  type Venue,
 } from "@/lib/api";
+import { accessToken } from "@/lib/supabase";
 import { subscribeWithReconnect, type ConnectionState } from "@/lib/realtime";
 
 export type ShaktiData = {
   incidents: Incident[];
   events: Event[];
+  venues: Venue[];
   loading: boolean;
   error: boolean;
   incidentState: ConnectionState;
@@ -26,25 +30,38 @@ export type ShaktiData = {
   prependEvent: (event: Event) => void;
 };
 
+function mergeIncident(current: Incident[], incident: Incident) {
+  return [...current.filter((item) => item.id !== incident.id), incident]
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    .slice(0, 200);
+}
+
+function mergeEvent(current: Event[], event: Event) {
+  return [event, ...current.filter((item) => item.id !== event.id)].slice(0, 200);
+}
+
 export function useShaktiData(): ShaktiData {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
+  const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [incidentState, setIncidentState] = useState<ConnectionState>("CONNECTING");
   const [eventState, setEventState] = useState<ConnectionState>("CONNECTING");
   const [refreshKey, setRefreshKey] = useState(0);
+  const hadLiveIncidentStream = useRef(false);
+  const hadLiveEventStream = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(false);
-    Promise.all([fetch(`${apiUrl}/health`), getIncidents(), getEvents()])
-      .then(async ([health, nextIncidents, nextEvents]) => {
+    Promise.all([getIncidents(), getEvents(), getVenues()])
+      .then(([nextIncidents, nextEvents, nextVenues]) => {
         if (cancelled) return;
-        if (!health.ok) throw new Error("Health check failed");
         setIncidents(nextIncidents);
         setEvents(nextEvents);
+        setVenues(nextVenues);
       })
       .catch(() => {
         if (!cancelled) setError(true);
@@ -58,36 +75,49 @@ export function useShaktiData(): ShaktiData {
   }, [refreshKey]);
 
   useEffect(() => {
+    const onIncidentState = (state: ConnectionState) => {
+      setIncidentState(state);
+      if (state === "LIVE") {
+        if (hadLiveIncidentStream.current) setRefreshKey((key) => key + 1);
+        hadLiveIncidentStream.current = true;
+      }
+    };
+    const onEventState = (state: ConnectionState) => {
+      setEventState(state);
+      if (state === "LIVE") {
+        if (hadLiveEventStream.current) setRefreshKey((key) => key + 1);
+        hadLiveEventStream.current = true;
+      }
+    };
     const stopIncidents = subscribeWithReconnect(
       websocketUrl("/ws/incidents"),
+      accessToken,
       (data) => {
         try {
           const update = JSON.parse(data) as { type: string; incident: Incident };
-          if (update.type === "incident.updated") {
-            setIncidents((current) =>
-              [...current.filter((item) => item.id !== update.incident.id), update.incident]
-                .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
-                .slice(0, 100),
-            );
+          if (update.type === "incident.updated" && update.incident?.id) {
+            setIncidents((current) => mergeIncident(current, update.incident));
           }
         } catch {
-          // Ignore malformed realtime payloads; the next refresh recovers.
+          // Ignore malformed realtime payloads; the next authenticated reload recovers.
         }
       },
-      setIncidentState,
+      onIncidentState,
     );
     const stopEvents = subscribeWithReconnect(
       websocketUrl("/ws/events"),
+      accessToken,
       (data) => {
         try {
           const update = JSON.parse(data) as { type: string; event: Event };
-          if (update.type === "event.created")
-            setEvents((current) => [update.event, ...current].slice(0, 100));
+          if (update.type === "event.created" && update.event?.id) {
+            setEvents((current) => mergeEvent(current, update.event));
+          }
         } catch {
-          // Ignore malformed realtime payloads; the next refresh recovers.
+          // Ignore malformed realtime payloads; the next authenticated reload recovers.
         }
       },
-      setEventState,
+      onEventState,
     );
     return () => {
       stopIncidents();
@@ -97,22 +127,18 @@ export function useShaktiData(): ShaktiData {
 
   const refresh = useCallback(() => setRefreshKey((key) => key + 1), []);
   const applyIncident = useCallback(
-    (incident: Incident) =>
-      setIncidents((current) =>
-        [...current.filter((item) => item.id !== incident.id), incident]
-          .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
-          .slice(0, 100),
-      ),
+    (incident: Incident) => setIncidents((current) => mergeIncident(current, incident)),
     [],
   );
   const prependEvent = useCallback(
-    (event: Event) => setEvents((current) => [event, ...current].slice(0, 100)),
+    (event: Event) => setEvents((current) => mergeEvent(current, event)),
     [],
   );
 
   return {
     incidents,
     events,
+    venues,
     loading,
     error,
     incidentState,
@@ -126,11 +152,15 @@ export function useShaktiData(): ShaktiData {
 
 export function useIncidentTimeline(incidentId: string | undefined) {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(incidentId));
   const [error, setError] = useState(false);
 
   const reload = useCallback(async () => {
-    if (!incidentId) return;
+    if (!incidentId) {
+      setTimeline([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(false);
     try {
@@ -144,7 +174,39 @@ export function useIncidentTimeline(incidentId: string | undefined) {
 
   useEffect(() => {
     void reload();
-  }, [reload]);
+    if (!incidentId) return;
+    const interval = setInterval(reload, 15_000);
+    return () => clearInterval(interval);
+  }, [reload, incidentId]);
 
   return { timeline, loading, error, reload, setTimeline };
+}
+
+export function useIncidentEvents(incidentId: string | undefined) {
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(Boolean(incidentId));
+  const [error, setError] = useState(false);
+
+  const reload = useCallback(async () => {
+    if (!incidentId) {
+      setEvents([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(false);
+    try {
+      setEvents(await getIncidentEvents(incidentId));
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [incidentId]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  return { events, loading, error, reload };
 }

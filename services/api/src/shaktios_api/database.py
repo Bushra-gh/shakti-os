@@ -1,9 +1,16 @@
 import os
 from collections.abc import Generator
+from pathlib import Path
 
+from dotenv import load_dotenv
 from sqlalchemy import Engine, create_engine, event as sa_event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import StaticPool
+
+# Load the monorepo root .env for local runs started from services/api or the
+# repository root. Explicit process environment variables still win, and
+# production deployments can continue to inject env vars directly.
+load_dotenv(Path(__file__).resolve().parents[4] / ".env")
 
 
 def database_url() -> str:
@@ -51,6 +58,11 @@ def build_engine() -> Engine:
         if ":memory:" in url:
             engine_options["poolclass"] = StaticPool
     else:
+        # Supabase's transaction pooler cannot preserve named prepared
+        # statements between transactions. Disable psycopg auto-prepare to
+        # avoid DuplicatePreparedStatement / prepared statement missing.
+        if url.startswith("postgresql+psycopg://"):
+            engine_options["connect_args"] = {"prepare_threshold": None}
         # Conservative pool sizing suitable for the Supabase shared pooler.
         engine_options["pool_size"] = _pool_size(5)
         engine_options["max_overflow"] = _max_overflow(10)
