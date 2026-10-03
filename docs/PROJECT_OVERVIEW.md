@@ -47,7 +47,7 @@ Email/password sign-in or sign-up → choose registered venue / QR / manual ID
 - Confirmation and detail fetch the stored report. History uses ownership-filtered `/me/reports`, currently the latest 50; it is not client filtering of the operator event feed.
 - Status follows the stored incident. “Operator Responding” reflects workflow state, **not** confirmed responder arrival or dispatch.
 - Native session and selected-venue ID persistence use SecureStore. Web storage falls back to memory; do not promise restoration after a full browser reload.
-- Citizens do not receive operator controls, operator WebSocket feeds, push alerts, SOS dispatch or a messaging inbox. Camera use is for QR scanning, not photo-evidence upload. Camera/manual parsing of venue QR text is implemented; automatic external deep-link joining remains incomplete and needs a separate fix/test.
+- Citizens do not receive operator controls, operator WebSocket feeds, push alerts, SOS dispatch or a messaging inbox. Camera use covers QR scanning and optional photo evidence (up to 3 compressed photos per report, uploaded to the `report-evidence` bucket and rendered on the operator dashboard). Camera/manual parsing of venue QR text is implemented; automatic external deep-link joining remains incomplete and needs a separate fix/test.
 
 Mobile installation, routes and device acceptance checks belong in the [app README](../../shaktios-app/README.md) and [build-readiness checklist](../../shaktios-app/BUILD_READINESS.md), not in a second mobile setup guide here.
 
@@ -62,7 +62,7 @@ Mobile installation, routes and device acceptance checks belong in the [app READ
 | Realtime | HTTP snapshots plus reconnecting in-process WebSockets | No multi-process fanout or replay |
 | Action handoff | Operator approval, webhook request and accepted-action timeline entry | Supplied n8n workflow validates/acknowledges only; no provider delivery, dispatch or exactly-once guarantee |
 | Source integration | Crowd simulator, Civic-Shield normalization/demo bridge, citizen normalization package | Not deployed CCTV analysis or production social-source collection; legacy citizen adapter delivery needs auth/venue integration |
-| Media / extra sign-in / alerts | No photo upload, phone login, Google login or push notifications | A reserved storage bucket is not an implemented media flow |
+| Media / extra sign-in / alerts | Photo evidence upload via the `report-evidence` bucket; no phone login, Google login or push notifications | Photo URLs ride in the report payload and render on the dashboard; no retention/deletion flow yet |
 
 “Implemented” describes source behavior, not proof that a particular hosted project, signed app or provider integration is working. Test commands and coverage boundaries are in [CONTRIBUTING.md](CONTRIBUTING.md); remaining work is tracked in [TASKS.md](TASKS.md).
 

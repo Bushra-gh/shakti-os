@@ -59,6 +59,14 @@ List endpoints return arrays, not pagination envelopes. Only `/me/reports` curre
 
 Voice does not require operator access and does not store a report, infer GPS, broadcast operational events or call n8n. The full multipart contract, error codes, server-only configuration and process-local rate limits live in [VOICE_REPORTING.md](VOICE_REPORTING.md).
 
+### Priority assist
+
+| Method / path | Access | Behavior |
+| --- | --- | --- |
+| `POST /priority/assess` | User | Sarvam triage of `{category, description, has_photo}` → validated `{suggested_urgency, priority, reasons}` |
+
+Priority assist never stores a report or infers GPS; invalid provider output and missing keys resolve to actionable manual-urgency messages. Source: `services/api/src/shaktios_api/priority.py`, tests in `services/api/tests/test_priority.py`.
+
 ## Event submission
 
 Machine signal example:
@@ -99,6 +107,7 @@ Citizen example, requiring a bearer token and the corresponding registered venue
     "category": "crowd",
     "description": "Demo observation: queue is blocking the entrance.",
     "urgency": "high",
+    "photo_urls": ["https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/report-evidence/<user_id>/<uuid>.jpg"],
     "latitude": null,
     "longitude": null,
     "accuracy": null
@@ -106,7 +115,7 @@ Citizen example, requiring a bearer token and the corresponding registered venue
 }
 ```
 
-For `citizen_report`, the server requires a valid session, `payload.venue_event_id` and a `location` zone belonging to that venue. Invalid venue/zone input returns `422`. It strips payload identity keys (`reporter_id`, `user_id`, `reporter`, `userId`), replaces top-level `reporter_id` with the verified JWT subject and ignores client-assigned incident links. The base Event model leaves the rest of the payload open; the mobile form's category/description/urgency validation is not a stricter server-side report schema.
+For `citizen_report`, the server requires a valid session, `payload.venue_event_id` and a `location` zone belonging to that venue. Invalid venue/zone input returns `422`. It strips payload identity keys (`reporter_id`, `user_id`, `reporter`, `userId`), replaces top-level `reporter_id` with the verified JWT subject and ignores client-assigned incident links. The base Event model leaves the rest of the payload open; the mobile form's category/description/urgency validation is not a stricter server-side report schema. Optional `payload.photo_urls` carries up to 3 public `report-evidence` bucket URLs, stored as-is and rendered as thumbnails on the operator dashboard.
 
 An owned report response extends Event with nullable `incident_status`, `venue_name` and `report_status`. [DOMAIN.md](DOMAIN.md) owns the status mapping, correlation algorithm and risk formula. Report status is workflow state, not delivery confirmation.
 

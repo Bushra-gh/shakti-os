@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { OperatorShell } from "@/components/dashboard/shell";
 import { SourceBadge } from "@/components/dashboard/badges";
+import { EvidencePhotos, photoUrlsFromPayload } from "@/components/dashboard/evidence-photos";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/dashboard/states";
 import { useShaktiData } from "@/hooks/use-shakti";
 import { formatFullDateTime, label } from "@/lib/format";
@@ -94,8 +95,8 @@ export default function ReportsPage() {
             <Badge variant="outline">{filtered.length}</Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Metadata that actually exists. No photo attachments are shown — the private
-            citizen-evidence storage bucket is reserved, but no backend upload endpoint exists yet.
+            Citizen photo evidence uploaded from the app appears below; reports without
+            photos show text metadata only.
           </p>
         </CardHeader>
         <CardContent className="p-0 pt-4">
@@ -117,6 +118,7 @@ export default function ReportsPage() {
                     <TableHead scope="col">Location</TableHead>
                     <TableHead scope="col">Linked incident</TableHead>
                     <TableHead scope="col">Description</TableHead>
+                    <TableHead scope="col">Photos</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -156,6 +158,9 @@ export default function ReportsPage() {
                         </TableCell>
                         <TableCell className="max-w-72 truncate text-sm" title={description}>
                           {description}
+                        </TableCell>
+                        <TableCell>
+                          <EvidencePhotos urls={photoUrlsFromPayload(e.payload)} size="sm" />
                         </TableCell>
                       </TableRow>
                     );

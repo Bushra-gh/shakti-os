@@ -1,6 +1,6 @@
 # Supabase: configuration, identity and schema
 
-Supabase supplies PostgreSQL and Auth for both the dashboard and citizen app. FastAPI owns operational reads/writes, correlation, risk and access checks. A private Storage bucket is reserved for future evidence attachments; it is not a working photo-upload feature.
+Supabase supplies PostgreSQL, Auth and Storage for both the dashboard and citizen app. FastAPI owns operational reads/writes, correlation, risk and access checks. The public `report-evidence` bucket stores citizen photo evidence uploaded directly from the app; the URLs travel inside the citizen_report payload and the dashboard renders them.
 
 Use the [root README](../README.md) for dependency installation and process startup. This guide owns database/Auth configuration and migration workflow.
 
@@ -39,6 +39,7 @@ supabase migration list
 | --- | --- |
 | `20260922000000_initial_shaktios_schema.sql` | Events, incidents, timeline, ownership column/indexes, deny-all client RLS policies and private evidence bucket |
 | `20260923000000_real_venues_and_coordinates.sql` | Venues, canonical zones, incident coordinates, registry indexes and RLS |
+| `20261003000000_report_evidence_bucket.sql` | Public `report-evidence` bucket with per-user write policies for citizen photo evidence |
 
 Operational tables:
 
@@ -79,7 +80,7 @@ The migrations enable RLS and deny direct `anon`/`authenticated` access on all f
 
 ## Storage and transient audio
 
-The initial migration reserves a private `citizen-evidence` bucket. There is no persisted photo/evidence attachment endpoint and no current mobile photo picker. A future upload flow needs its own authorization, ownership, retention and signed-access design.
+The `20261003000000_report_evidence_bucket.sql` migration creates a public `report-evidence` bucket. The app compresses photos on-device, uploads them to `<user_id>/<uuid>.jpg` (each citizen writes only their own folder), and submits the public URLs as `photo_urls` in the citizen_report payload. The backend stores the payload as-is; no separate media endpoint exists. The initial migration's private `citizen-evidence` bucket is superseded and unused.
 
 Optional voice **does** upload multipart audio to FastAPI for transient processing by Sarvam; it is not uploaded to this bucket or stored as a report attachment. Local non-persistence does not establish the provider's retention policy. See [VOICE_REPORTING.md](VOICE_REPORTING.md).
 

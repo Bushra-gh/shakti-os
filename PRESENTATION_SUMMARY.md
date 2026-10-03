@@ -59,9 +59,9 @@ The [demo walkthrough](docs/DEMO.md) contains preflight, fresh multi-source inpu
 | “Voice assists entry after consent and human review.” | Guaranteed transcription accuracy, automatic submission or verified native/provider performance |
 | “The dashboard uses authenticated WebSockets and HTTP refresh.” | Durable replay, horizontally scalable fanout or unbounded history/analytics |
 | “n8n accepted the approved handoff.” | A message was delivered or responders were dispatched |
-| “The app can scan venue QR codes and capture optional GPS.” | Photo evidence upload, SOS dispatch, chat/inbox or working automatic external deep-link joining |
+| “The app can scan venue QR codes, capture optional GPS and attach up to 3 photo evidence images.” | SOS dispatch, chat/inbox or working automatic external deep-link joining |
 
-Photo upload, phone/Google sign-in and push notifications are not implemented. Machine ingestion remains open for local integrations; broader production access/abuse controls are still needed.
+Phone/Google sign-in and push notifications are not implemented. Machine ingestion remains open for local integrations; broader production access/abuse controls are still needed.
 
 ## Verification and maturity
 

@@ -25,6 +25,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { OperatorShell } from "@/components/dashboard/shell";
 import { EventTypeBadge, SeverityBadge, SourceBadge, StatusBadge } from "@/components/dashboard/badges";
+import { EvidencePhotos, PhotoBadge, photoUrlsFromPayload } from "@/components/dashboard/evidence-photos";
 import { RiskFactors, RiskScore } from "@/components/dashboard/risk";
 import { TimelineView } from "@/components/dashboard/timeline-view";
 import { EmptyState } from "@/components/dashboard/states";
@@ -291,19 +292,21 @@ function IncidentDetailView({ incidentId }: { incidentId: string }) {
                       <TableBody>
                         {sameLocationEvents.map((e) => {
                           const detail = evidenceDetail(e);
+                          const photos = photoUrlsFromPayload(e.payload as Record<string, unknown>);
                           return (
                             <TableRow key={e.id}>
                               <TableCell><EventTypeBadge type={e.type} /></TableCell>
                               <TableCell><SourceBadge source={e.source} /></TableCell>
                               <TableCell className="max-w-72">
                                 <p className="truncate text-xs text-muted-foreground" title={detail.text}>
-                                  {detail.text}
+                                  {detail.text} <PhotoBadge count={photos.length} />
                                 </p>
                                 {detail.meta && (
                                   <p className="mt-0.5 truncate text-[11px] text-muted-foreground" title={detail.meta}>
                                     {detail.meta}
                                   </p>
                                 )}
+                                <EvidencePhotos urls={photos} size="sm" className="mt-1.5" />
                               </TableCell>
                               <TableCell className="text-right text-xs text-muted-foreground">
                                 {formatFullDateTime(e.timestamp)}

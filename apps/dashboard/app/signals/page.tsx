@@ -13,10 +13,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { OperatorShell } from "@/components/dashboard/shell";
 import { EventTypeBadge, SourceBadge } from "@/components/dashboard/badges";
+import { EvidencePhotos, photoUrlsFromPayload } from "@/components/dashboard/evidence-photos";
 import { SignalDialog } from "@/components/dashboard/signal-dialog";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/dashboard/states";
 import { useShaktiData } from "@/hooks/use-shakti";
-import { EVENT_TYPES, formatFullDateTime, label } from "@/lib/format";
+import { EVENT_TYPES, formatFullDateTime, label, sourceMeta } from "@/lib/format";
 import type { Event } from "@/lib/api";
 
 function payloadSummary(payload: Record<string, unknown>) {
@@ -30,11 +31,41 @@ export default function SignalsPage() {
   const [query, setQuery] = useState("");
   const [type, setType] = useState("all");
   const [source, setSource] = useState("all");
+  const [location, setLocation] = useState("all");
   const [detail, setDetail] = useState<Event | null>(null);
 
-  const sources = useMemo(() => Array.from(new Set(events.map((e) => e.source))).sort(), [events]);
-  const locations = useMemo(() => Array.from(new Set(events.map((e) => e.location))).sort(), [events]);
-  const [location, setLocation] = useState("all");
+  const zoneLabels = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const venue of venues) {
+      for (const zone of venue.zones) {
+        if (!map.has(zone.id)) map.set(zone.id, zone.label);
+      }
+    }
+    return map;
+  }, [venues]);
+
+  const locationName = (id: string) => zoneLabels.get(id) ?? label(id);
+
+  const typeOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of events) counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
+    return EVENT_TYPES.map((t) => ({ value: t, count: counts.get(t) ?? 0 }));
+  }, [events]);
+  const sourceOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of events) counts.set(e.source, (counts.get(e.source) ?? 0) + 1);
+    return Array.from(counts.entries())
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => sourceMeta(a.value).name.localeCompare(sourceMeta(b.value).name));
+  }, [events]);
+  const locationOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of events) counts.set(e.location, (counts.get(e.location) ?? 0) + 1);
+    const displayName = (id: string) => zoneLabels.get(id) ?? label(id);
+    return Array.from(counts.entries())
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => displayName(a.value).localeCompare(displayName(b.value)));
+  }, [events, zoneLabels]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -46,6 +77,14 @@ export default function SignalsPage() {
       return true;
     });
   }, [events, query, type, source, location]);
+
+  const hasActiveFilters = query.trim() !== "" || type !== "all" || source !== "all" || location !== "all";
+  const clearFilters = () => {
+    setQuery("");
+    setType("all");
+    setSource("all");
+    setLocation("all");
+  };
 
   return (
     <OperatorShell>
@@ -80,34 +119,45 @@ export default function SignalsPage() {
                 <SelectValue placeholder="All types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
-                {EVENT_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>{label(t)}</SelectItem>
+                <SelectItem value="all">All types ({events.length})</SelectItem>
+                {typeOptions.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{label(t.value)} ({t.count})</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select value={source} onValueChange={(v) => v && setSource(v)}>
-              <SelectTrigger className="h-10 w-44 rounded-lg bg-muted" aria-label="Filter by source">
+              <SelectTrigger className="h-10 w-48 rounded-lg bg-muted" aria-label="Filter by source">
                 <SelectValue placeholder="All sources" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All sources</SelectItem>
-                {sources.map((s) => (
-                  <SelectItem key={s} value={s}>{label(s)}</SelectItem>
+                <SelectItem value="all">All sources ({events.length})</SelectItem>
+                {sourceOptions.length === 0 && (
+                  <SelectItem value="__none" disabled>No sources yet</SelectItem>
+                )}
+                {sourceOptions.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>{sourceMeta(s.value).name} ({s.count})</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select value={location} onValueChange={(v) => v && setLocation(v)}>
-              <SelectTrigger className="h-10 w-40 rounded-lg bg-muted" aria-label="Filter by location">
+              <SelectTrigger className="h-10 w-48 rounded-lg bg-muted" aria-label="Filter by location">
                 <SelectValue placeholder="All locations" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All locations</SelectItem>
-                {locations.map((l) => (
-                  <SelectItem key={l} value={l}>{label(l)}</SelectItem>
+                <SelectItem value="all">All locations ({events.length})</SelectItem>
+                {locationOptions.length === 0 && (
+                  <SelectItem value="__none" disabled>No locations yet</SelectItem>
+                )}
+                {locationOptions.map((l) => (
+                  <SelectItem key={l.value} value={l.value}>{locationName(l.value)} ({l.count})</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" className="rounded-lg" onClick={clearFilters}>
+                Clear
+              </Button>
+            )}
             <Badge variant="outline" className="ml-auto">{filtered.length}</Badge>
           </div>
         </CardHeader>
@@ -151,8 +201,8 @@ export default function SignalsPage() {
                         </button>
                       </TableCell>
                       <TableCell><SourceBadge source={item.source} /></TableCell>
-                      <TableCell className="capitalize text-muted-foreground">
-                        {label(item.location)}
+                      <TableCell className="capitalize text-muted-foreground" title={item.location}>
+                        {locationName(item.location)}
                       </TableCell>
                       <TableCell className="text-right font-medium tabular-nums">
                         {Math.round(item.confidence * 100)}%
@@ -204,6 +254,14 @@ export default function SignalsPage() {
                     <dd className="min-w-0 text-right font-medium break-all">{v}</dd>
                   </div>
                 ))}
+                {photoUrlsFromPayload(detail.payload).length > 0 && (
+                  <div>
+                    <dt className="text-muted-foreground">Photo evidence</dt>
+                    <dd>
+                      <EvidencePhotos urls={photoUrlsFromPayload(detail.payload)} className="mt-1.5" />
+                    </dd>
+                  </div>
+                )}
                 <div>
                   <dt className="text-muted-foreground">Payload</dt>
                   <dd>
