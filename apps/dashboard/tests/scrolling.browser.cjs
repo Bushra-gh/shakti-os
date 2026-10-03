@@ -12,9 +12,8 @@ const { mkdirSync } = require('node:fs');
 const process = require('node:process');
 const { Buffer } = require('node:buffer');
 const { chromium } = require(process.argv[2] || 'playwright');
-try { process.loadEnvFile(path.resolve(__dirname, '../.env.local')); } catch (error) {
-  if (error.code !== 'ENOENT') throw error;
-}
+// Pass synthetic NEXT_PUBLIC_* values matching the test server explicitly.
+// Never load a private dotenv file or use a real stored browser session.
 
 const dashboardOrigin = process.argv[4] || 'http://localhost:3000';
 const screenshotDirectory = process.argv[5];

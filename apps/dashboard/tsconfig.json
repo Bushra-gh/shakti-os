@@ -9,7 +9,9 @@
     "paths": {
       "@/*": ["./*"]
     },
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": [
     "**/*.ts",

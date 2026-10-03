@@ -95,6 +95,7 @@ function SidebarBody({
                 href={href}
                 onClick={onNavigate}
                 aria-current={active ? "page" : undefined}
+                aria-label={collapsed ? itemLabel : undefined}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   active
@@ -126,6 +127,7 @@ function SidebarBody({
       <div className={cn("border-t border-border p-3", collapsed && "px-2")}>
         <Link
           href="/settings"
+          aria-label="Open operator settings"
           onClick={onNavigate}
           className={cn(
             "flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted",
@@ -166,6 +168,7 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (v:
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -173,12 +176,12 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (v:
       setResults([]);
       return;
     }
+    let cancelled = false;
     setLoading(true);
-    Promise.all([
-      getIncidents().catch(() => []),
-      getEvents().catch(() => []),
-    ])
+    setError(false);
+    Promise.all([getIncidents(), getEvents()])
       .then(([incidents, events]) => {
+        if (cancelled) return;
         const mapped: SearchResult[] = [
           ...(Array.isArray(incidents) ? incidents : []).map((i) => ({
             key: `incident-${i.id}`,
@@ -197,9 +200,10 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (v:
         ];
         setResults(mapped);
       })
-      .catch(() => setResults([]))
-      .finally(() => setLoading(false));
-  }, [open ]);
+      .catch(() => { if (!cancelled) { setResults([]); setError(true); } })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [open]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -227,7 +231,8 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (v:
         </div>
         <ScrollArea className="max-h-80">
           <div className="p-2">
-            {!loading && filtered.length === 0 && (
+            {!loading && error && <p role="alert" className="px-3 py-8 text-center text-sm text-destructive">Search data unavailable. Close and reopen to retry.</p>}
+            {!loading && !error && filtered.length === 0 && (
               <p className="px-3 py-8 text-center text-sm text-muted-foreground">
                 No matching incidents or signals in recent data.
               </p>
@@ -292,8 +297,9 @@ export function OperatorShell({ children }: { children: ReactNode }) {
   const [eventState, setEventState] = useState<ConnectionState>("CONNECTING");
 
   useEffect(() => {
-    const stored = localStorage.getItem("shaktios-sidebar-collapsed");
-    if (stored === "1") setCollapsed(true);
+    try {
+      if (localStorage.getItem("shaktios-sidebar-collapsed") === "1") setCollapsed(true);
+    } catch { /* Storage may be blocked by browser policy. */ }
   }, []);
 
   useEffect(() => {
@@ -319,7 +325,8 @@ export function OperatorShell({ children }: { children: ReactNode }) {
 
   const toggleCollapsed = () => {
     setCollapsed((v) => {
-      localStorage.setItem("shaktios-sidebar-collapsed", v ? "0" : "1");
+      try { localStorage.setItem("shaktios-sidebar-collapsed", v ? "0" : "1"); }
+      catch { /* Navigation still works without preference persistence. */ }
       return !v;
     });
   };

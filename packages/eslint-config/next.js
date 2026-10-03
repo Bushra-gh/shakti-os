@@ -19,12 +19,24 @@ export const nextJsConfig = [
     "next-env.d.ts",
   ]),
   {
+    files: ["**/*.{js,mjs,cjs,ts,tsx}"],
     languageOptions: {
       globals: {
         ...globals.browser,
         ...globals.serviceworker,
+        ...globals.node,
+      },
+      parserOptions: {
+        babelOptions: {
+          presets: [["@babel/preset-typescript", { allExtensions: true, isTSX: true }]],
+        },
       },
     },
+  },
+  {
+    files: ["**/*.{ts,tsx}"],
+    // Babel parses TypeScript; tsc supplies the type-aware scope/unused checks.
+    rules: { "no-undef": "off", "no-unused-vars": "off" },
   },
   {
     plugins: {
@@ -35,5 +47,11 @@ export const nextJsConfig = [
       ...pluginNext.configs["core-web-vitals"].rules,
     },
   },
-  pluginReactHooks.configs.flat.recommended,
+  {
+    plugins: { "react-hooks": pluginReactHooks },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "error",
+    },
+  },
 ];
