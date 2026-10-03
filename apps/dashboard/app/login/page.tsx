@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getMe } from "@/lib/api";
-import { supabase, supabaseConfigured } from "@/lib/supabase";
+import { supabase, supabaseConfigured, supabaseConfigurationError } from "@/lib/supabase";
+import { apiConfigurationError } from "@/lib/config";
 
 /**
  * Operator sign-in boundary.
@@ -27,6 +28,7 @@ export default function LoginPage() {
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (loading) return;
     setError(null);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       setError("Enter a valid operator email address.");
@@ -37,8 +39,8 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
-    if (!supabaseConfigured) {
-      setError("Operator sign-in is unavailable until Supabase Auth is configured.");
+    if (!supabaseConfigured || apiConfigurationError) {
+      setError(apiConfigurationError ?? supabaseConfigurationError ?? "Operator sign-in is unavailable until Supabase Auth is configured.");
       setLoading(false);
       return;
     }
@@ -63,7 +65,7 @@ export default function LoginPage() {
       }
       router.replace("/dashboard");
     } catch {
-      setError("Sign-in failed. Check your credentials and the auth service.");
+      setError("Sign-in or operator verification failed. Check API/Auth configuration and connectivity, then retry.");
       setLoading(false);
     }
   };
@@ -96,6 +98,7 @@ export default function LoginPage() {
             </div>
             <h2 className="text-2xl font-medium tracking-[-0.03em]">Operator login</h2>
             <p className="mt-1 text-sm text-muted-foreground">Access the command center.</p>
+            {(apiConfigurationError || supabaseConfigurationError) && <p className="mt-4 text-sm text-destructive" role="alert">{apiConfigurationError ?? supabaseConfigurationError}</p>}
             <form className="mt-6 space-y-4" onSubmit={submit} noValidate>
               <div className="space-y-2">
                 <label htmlFor="login-email" className="text-xs font-medium text-muted-foreground">

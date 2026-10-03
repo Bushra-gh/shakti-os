@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ChevronRight,
@@ -62,9 +62,16 @@ export default function IncidentDetail({
 }: {
   params: Promise<{ incidentId: string }>;
 }) {
+  const { incidentId } = use(params);
+  return <IncidentDetailView key={incidentId} incidentId={incidentId} />;
+}
+
+function IncidentDetailView({ incidentId }: { incidentId: string }) {
   const [incident, setIncident] = useState<Incident | null>(null);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
-  const [incidentId, setIncidentId] = useState<string>();
+  const mutationPending = useRef(false);
+  const readRevision = useRef(0);
+  const [statusSending, setStatusSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [timelineError, setTimelineError] = useState(false);
@@ -81,22 +88,19 @@ export default function IncidentDetail({
   const { events, loading: eventsLoading, error: eventsError, reload: reloadEvents } = useIncidentEvents(incidentId);
 
   useEffect(() => {
-    let cancelled = false;
-    params.then(({ incidentId: id }) => { if (!cancelled) setIncidentId(id); });
-    return () => { cancelled = true; };
-  }, [params]);
-
-  useEffect(() => {
     if (!incidentId) return;
     let cancelled = false;
     const load = () => {
+      if (mutationPending.current) return;
+      const request = ++readRevision.current;
+      const current = () => !cancelled && request === readRevision.current;
       getIncident(incidentId).then((value) => {
-        if (!cancelled) { setIncident(value); setError(false); }
-      }).catch(() => { if (!cancelled) setError(true); })
-        .finally(() => { if (!cancelled) setLoading(false); });
+        if (current()) { setIncident(value); setError(false); }
+      }).catch(() => { if (current()) setError(true); })
+        .finally(() => { if (current()) setLoading(false); });
       getTimeline(incidentId).then((value) => {
-        if (!cancelled) { setTimeline(value); setTimelineError(false); }
-      }).catch(() => { if (!cancelled) setTimelineError(true); });
+        if (current()) { setTimeline(value); setTimelineError(false); }
+      }).catch(() => { if (current()) setTimelineError(true); });
       void reloadEvents();
     };
     setLoading(true);
@@ -117,7 +121,10 @@ export default function IncidentDetail({
   }, [incidentId, reloadEvents]);
 
   const changeStatus = async (status: string) => {
-    if (!incidentId) return;
+    if (mutationPending.current) return;
+    mutationPending.current = true;
+    readRevision.current += 1;
+    setStatusSending(true);
     setStatusError(false);
     try {
       setIncident(await updateIncidentStatus(incidentId, status, note || undefined));
@@ -129,15 +136,20 @@ export default function IncidentDetail({
       await reloadEvents();
     } catch {
       setStatusError(true);
+    } finally {
+      mutationPending.current = false;
+      setStatusSending(false);
     }
   };
 
   const requestAction = async () => {
-    if (!incidentId) return;
+    if (mutationPending.current || incident?.status !== "RESPONDING" || !actionType.trim()) return;
+    mutationPending.current = true;
+    readRevision.current += 1;
     setActionState("sending");
     setActionError(null);
     try {
-      await requestIncidentAction(incidentId, actionType, note || undefined);
+      await requestIncidentAction(incidentId, actionType.trim(), note || undefined);
       setActionState("accepted");
       setReviewOpen(false);
       // The handoff has succeeded. A later timeline read failure must not
@@ -149,7 +161,9 @@ export default function IncidentDetail({
       await reloadEvents();
     } catch (err) {
       setActionState("error");
-      setActionError(err instanceof Error ? err.message : "Workflow request failed.");
+      setActionError(`${err instanceof Error ? err.message : "Workflow request failed."} Delivery may be unconfirmed; inspect the timeline and n8n execution history before retrying.`);
+    } finally {
+      mutationPending.current = false;
     }
   };
 
@@ -241,7 +255,7 @@ export default function IncidentDetail({
                 <div>
                   <p className="text-sm font-medium">Why this incident exists</p>
                   <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
-                    <li>· {correlatedEvents.length} correlated {correlatedEvents.length === 1 ? "signal" : "signals"} at {label(incident.location)}</li>
+                    <li>· {correlatedEvents.length} correlated {correlatedEvents.length === 1 ? "signal" : "signals"} in the returned timeline window at {label(incident.location)}</li>
                     <li>· {Object.keys(incident.factors).filter((k) => k !== "citizen_report_count").length} explainable risk factors tracked</li>
                     <li>· Confidence {Math.round(incident.confidence * 100)}% (strongest contributing signal)</li>
                     <li>· Status {incident.status} — operator-controlled lifecycle</li>
@@ -257,7 +271,7 @@ export default function IncidentDetail({
               <CardHeader className="px-6 pt-6 pb-0">
                 <CardTitle className="text-lg font-medium">Signals / evidence</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Events related to this incident, newest first.
+                  Latest 8 of the returned evidence window (up to 100 records), newest first.
                 </p>
               </CardHeader>
               <CardContent className="p-0 pt-2 pb-2">
@@ -349,6 +363,7 @@ export default function IncidentDetail({
                       key={status}
                       className="rounded-lg font-medium"
                       variant={status === "RESOLVED" ? "outline" : "default"}
+                      disabled={statusSending || actionState === "sending"}
                       onClick={() => changeStatus(status)}
                     >
                       {status === "ASSESSING" && "Begin assessment"}
@@ -386,13 +401,15 @@ export default function IncidentDetail({
                       id="action-type"
                       className="h-11 rounded-lg bg-card"
                       value={actionType}
+                      maxLength={100}
+                      disabled={actionState === "sending"}
                       onChange={(event) => setActionType(event.target.value)}
                     />
                   </label>
                   <div className="flex gap-2">
                     <Button
                       className="rounded-lg font-medium"
-                      disabled={actionState === "sending" || !actionType.trim() || !integrations?.n8n.configured || !integrations.n8n.authenticated}
+                      disabled={statusSending || actionState === "sending" || !actionType.trim() || !integrations?.n8n.configured || !integrations.n8n.authenticated}
                       onClick={() => setReviewOpen(true)}
                     >
                       Review & approve
@@ -443,7 +460,7 @@ export default function IncidentDetail({
                 <Button variant="outline" className="rounded-lg" onClick={() => setReviewOpen(false)}>
                   Cancel
                 </Button>
-                <Button className="rounded-lg" disabled={actionState === "sending" || !integrations?.n8n.configured || !integrations.n8n.authenticated} onClick={requestAction}>
+                <Button className="rounded-lg" disabled={statusSending || incident.status !== "RESPONDING" || !actionType.trim() || actionState === "sending" || !integrations?.n8n.configured || !integrations.n8n.authenticated} onClick={requestAction}>
                   {actionState === "sending" ? "Submitting…" : "Approve action"}
                 </Button>
               </div>

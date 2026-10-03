@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { ApiError, getMe, type Me } from "@/lib/api";
-import { supabase } from "@/lib/supabase";
+import { supabase, supabaseConfigurationError } from "@/lib/supabase";
+import { apiConfigurationError } from "@/lib/config";
 
 const OperatorContext = createContext<Me | null>(null);
 
@@ -32,8 +33,8 @@ export function OperatorGate({ children }: { children: ReactNode }) {
     setIdentity(null);
     setError(null);
     const client = supabase();
-    if (!client) {
-      setError("Supabase Auth is not configured. Operator access is unavailable.");
+    if (!client || apiConfigurationError) {
+      setError(apiConfigurationError ?? supabaseConfigurationError ?? "Supabase Auth is not configured. Operator access is unavailable.");
       return;
     }
     const verify = async () => {
@@ -58,14 +59,23 @@ export function OperatorGate({ children }: { children: ReactNode }) {
       }
     };
     void verify();
+    let verifiedUser: string | undefined;
     const { data } = client.auth.onAuthStateChange((event, session) => {
       // Do not await Supabase methods inside its auth callback (it holds an auth lock).
+      if (cancelled) return;
       if (!session) {
         revision += 1;
+        verifiedUser = undefined;
         setIdentity(null);
         router.replace("/login");
-      } else if (event !== "INITIAL_SESSION") {
-        setIdentity(null);
+      } else if (event === "INITIAL_SESSION") {
+        verifiedUser = session.user.id;
+      } else {
+        // Invalidate in-flight /me synchronously, before the deferred auth read.
+        revision += 1;
+        // Routine token refresh/profile updates must not unmount pending forms.
+        if (verifiedUser !== session.user.id) setIdentity(null);
+        verifiedUser = session.user.id;
         window.setTimeout(() => { if (!cancelled) void verify(); }, 0);
       }
     });

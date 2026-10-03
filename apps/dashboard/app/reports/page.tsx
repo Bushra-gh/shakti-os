@@ -13,6 +13,7 @@ import { SourceBadge } from "@/components/dashboard/badges";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/dashboard/states";
 import { useShaktiData } from "@/hooks/use-shakti";
 import { formatFullDateTime, label } from "@/lib/format";
+import { toCsv } from "@/lib/csv";
 
 export default function ReportsPage() {
   const { events, loading, error, refresh } = useShaktiData();
@@ -36,10 +37,10 @@ export default function ReportsPage() {
         e.location,
         String(e.confidence),
         e.incident_id ?? "",
-        JSON.stringify(e.payload).replaceAll('"', '""'),
+        JSON.stringify(e.payload),
       ]);
     }
-    const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+    const csv = toCsv(rows);
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -78,7 +79,7 @@ export default function ReportsPage() {
             size="sm"
             className="rounded-lg"
             onClick={exportCsv}
-            disabled={filtered.length === 0}
+            disabled={loading || error || filtered.length === 0}
           >
             <Download className="size-3.5" aria-hidden />
             Export
@@ -150,7 +151,7 @@ export default function ReportsPage() {
                               Open incident →
                             </Link>
                           ) : (
-                            <span className="text-xs text-muted-foreground">Correlating…</span>
+                            <span className="text-xs text-muted-foreground">Not linked</span>
                           )}
                         </TableCell>
                         <TableCell className="max-w-72 truncate text-sm" title={description}>

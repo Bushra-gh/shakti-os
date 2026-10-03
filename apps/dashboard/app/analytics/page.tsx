@@ -143,7 +143,7 @@ export default function AnalyticsPage() {
       <div className="mb-5">
         <h1 className="text-2xl font-medium tracking-[-0.03em]">Analytics & Insights</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Trends and operational insights — computed from available backend data only.
+          Snapshot insights from at most 200 recently updated incidents and 200 events, not database-wide historical totals.
         </p>
       </div>
 
@@ -171,10 +171,10 @@ export default function AnalyticsPage() {
         <>
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Key metrics">
             {[
-              { title: "Total incidents", value: String(incidents.length), note: `${resolved.length} resolved` },
-              { title: "Avg. resolution", value: avgResolutionMinutes === null ? "—" : `${avgResolutionMinutes} min`, note: "Created → last update" },
+              { title: "Incidents in snapshot", value: String(incidents.length), note: `${resolved.length} resolved` },
+              { title: "Resolution proxy", value: avgResolutionMinutes === null ? "—" : `${avgResolutionMinutes} min`, note: "Created → last update" },
               { title: "Signals (recent)", value: String(events.length), note: "Latest retained events" },
-              { title: "Active sources", value: `${activeSources}`, note: "Distinct source identifiers" },
+              { title: "Observed sources", value: `${activeSources}`, note: "Distinct source identifiers" },
             ].map((kpi) => (
               <Card key={kpi.title} className="rounded-xl bg-card py-0 ring-0">
                 <CardContent className="p-6">
@@ -192,7 +192,7 @@ export default function AnalyticsPage() {
             <Card className="rounded-xl bg-card py-0 ring-0">
               <CardHeader className="px-6 pt-6 pb-0">
                 <CardTitle className="text-lg font-medium">Incident trend</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">New incidents per day, last 7 days</p>
+                <p className="mt-1 text-sm text-muted-foreground">Snapshot incidents grouped by creation day (last 7 days)</p>
               </CardHeader>
               <CardContent className="p-6">
                 <TrendChart points={incidentsPerDay} color="var(--primary)" />
@@ -204,8 +204,8 @@ export default function AnalyticsPage() {
             </Card>
             <Card className="rounded-xl bg-card py-0 ring-0">
               <CardHeader className="px-6 pt-6 pb-0">
-                <CardTitle className="text-lg font-medium">Average risk trend</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">Mean risk score (%) per day, last 7 days</p>
+                <CardTitle className="text-lg font-medium">Current risk by creation day</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">Current mean risk (%) of each creation-day cohort, not historical risk</p>
               </CardHeader>
               <CardContent className="p-6">
                 <TrendChart points={avgRiskPerDay} color="var(--severity-high)" />

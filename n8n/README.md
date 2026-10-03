@@ -38,6 +38,10 @@ Action** only after configuring the required credential and approval policy.
    `X-ShaktiOS-Webhook-Secret` header, and n8n Header Auth rejects requests
    with the wrong value. Do not expose the webhook URL publicly without auth.
 
+## Offline contract checks
+
+From the monorepo root run `node --test n8n/test-contract.cjs`. This validates the checked-in workflow's authentication, acknowledgement-only node boundary and payload logic using synthetic objects. It does not execute n8n or send a webhook.
+
 ## Test it
 
 Sign in with an authorized operator account, then move an incident through

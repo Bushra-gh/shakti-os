@@ -31,13 +31,16 @@ export type ShaktiData = {
 };
 
 function mergeIncident(current: Incident[], incident: Incident) {
+  const existing = current.find((item) => item.id === incident.id);
+  if (existing && existing.updated_at > incident.updated_at) return current;
   return [...current.filter((item) => item.id !== incident.id), incident]
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
     .slice(0, 200);
 }
 
 function mergeEvent(current: Event[], event: Event) {
-  return [event, ...current.filter((item) => item.id !== event.id)].slice(0, 200);
+  return [event, ...current.filter((item) => item.id !== event.id)]
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 200);
 }
 
 export function useShaktiData(): ShaktiData {
@@ -49,18 +52,21 @@ export function useShaktiData(): ShaktiData {
   const [incidentState, setIncidentState] = useState<ConnectionState>("CONNECTING");
   const [eventState, setEventState] = useState<ConnectionState>("CONNECTING");
   const [refreshKey, setRefreshKey] = useState(0);
-  const hadLiveIncidentStream = useRef(false);
-  const hadLiveEventStream = useRef(false);
+  const incidentUpdates = useRef(new Map<string, Incident>());
+  const eventUpdates = useRef(new Map<string, Event>());
 
   useEffect(() => {
     let cancelled = false;
+    incidentUpdates.current.clear();
+    eventUpdates.current.clear();
     setLoading(true);
     setError(false);
     Promise.all([getIncidents(), getEvents(), getVenues()])
       .then(([nextIncidents, nextEvents, nextVenues]) => {
         if (cancelled) return;
-        setIncidents(nextIncidents);
-        setEvents(nextEvents);
+        // HTTP may have been captured before an event delivered during this read.
+        setIncidents([...incidentUpdates.current.values()].reduce(mergeIncident, nextIncidents));
+        setEvents([...eventUpdates.current.values()].reduce(mergeEvent, nextEvents));
         setVenues(nextVenues);
       })
       .catch(() => {
@@ -77,17 +83,12 @@ export function useShaktiData(): ShaktiData {
   useEffect(() => {
     const onIncidentState = (state: ConnectionState) => {
       setIncidentState(state);
-      if (state === "LIVE") {
-        if (hadLiveIncidentStream.current) setRefreshKey((key) => key + 1);
-        hadLiveIncidentStream.current = true;
-      }
+      // Also reload on first acknowledgement: initial HTTP and WS are not atomic.
+      if (state === "LIVE") setRefreshKey((key) => key + 1);
     };
     const onEventState = (state: ConnectionState) => {
       setEventState(state);
-      if (state === "LIVE") {
-        if (hadLiveEventStream.current) setRefreshKey((key) => key + 1);
-        hadLiveEventStream.current = true;
-      }
+      if (state === "LIVE") setRefreshKey((key) => key + 1);
     };
     const stopIncidents = subscribeWithReconnect(
       websocketUrl("/ws/incidents"),
@@ -96,6 +97,7 @@ export function useShaktiData(): ShaktiData {
         try {
           const update = JSON.parse(data) as { type: string; incident: Incident };
           if (update.type === "incident.updated" && update.incident?.id) {
+            incidentUpdates.current.set(update.incident.id, update.incident);
             setIncidents((current) => mergeIncident(current, update.incident));
           }
         } catch {
@@ -111,6 +113,7 @@ export function useShaktiData(): ShaktiData {
         try {
           const update = JSON.parse(data) as { type: string; event: Event };
           if (update.type === "event.created" && update.event?.id) {
+            eventUpdates.current.set(update.event.id, update.event);
             setEvents((current) => mergeEvent(current, update.event));
           }
         } catch {
@@ -127,11 +130,17 @@ export function useShaktiData(): ShaktiData {
 
   const refresh = useCallback(() => setRefreshKey((key) => key + 1), []);
   const applyIncident = useCallback(
-    (incident: Incident) => setIncidents((current) => mergeIncident(current, incident)),
+    (incident: Incident) => {
+      incidentUpdates.current.set(incident.id, incident);
+      setIncidents((current) => mergeIncident(current, incident));
+    },
     [],
   );
   const prependEvent = useCallback(
-    (event: Event) => setEvents((current) => mergeEvent(current, event)),
+    (event: Event) => {
+      eventUpdates.current.set(event.id, event);
+      setEvents((current) => mergeEvent(current, event));
+    },
     [],
   );
 
@@ -150,63 +159,49 @@ export function useShaktiData(): ShaktiData {
   };
 }
 
-export function useIncidentTimeline(incidentId: string | undefined) {
-  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+/** Latest request wins, and a departed incident's response can never replace this one. */
+function useIncidentResource<T>(incidentId: string | undefined, read: (id: string) => Promise<T[]>, poll = false) {
+  const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(Boolean(incidentId));
   const [error, setError] = useState(false);
+  const revision = useRef(0);
 
   const reload = useCallback(async () => {
+    const request = ++revision.current;
     if (!incidentId) {
-      setTimeline([]);
+      setData([]);
       setLoading(false);
+      setError(false);
       return;
     }
     setLoading(true);
     setError(false);
     try {
-      setTimeline(await getTimeline(incidentId));
+      const next = await read(incidentId);
+      if (request === revision.current) setData(next);
     } catch {
-      setError(true);
+      if (request === revision.current) setError(true);
     } finally {
-      setLoading(false);
+      if (request === revision.current) setLoading(false);
     }
-  }, [incidentId]);
+  }, [incidentId, read]);
 
   useEffect(() => {
+    setData([]);
     void reload();
-    if (!incidentId) return;
-    const interval = setInterval(reload, 15_000);
-    return () => clearInterval(interval);
-  }, [reload, incidentId]);
+    const timer = poll && incidentId ? setInterval(() => void reload(), 15_000) : undefined;
+    return () => { revision.current += 1; clearInterval(timer); };
+  }, [reload, poll, incidentId]);
 
-  return { timeline, loading, error, reload, setTimeline };
+  return { data, loading, error, reload, setData };
+}
+
+export function useIncidentTimeline(incidentId: string | undefined) {
+  const result = useIncidentResource<TimelineEntry>(incidentId, getTimeline, true);
+  return { timeline: result.data, loading: result.loading, error: result.error, reload: result.reload, setTimeline: result.setData };
 }
 
 export function useIncidentEvents(incidentId: string | undefined) {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(Boolean(incidentId));
-  const [error, setError] = useState(false);
-
-  const reload = useCallback(async () => {
-    if (!incidentId) {
-      setEvents([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(false);
-    try {
-      setEvents(await getIncidentEvents(incidentId));
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [incidentId]);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
-  return { events, loading, error, reload };
+  const result = useIncidentResource<Event>(incidentId, getIncidentEvents);
+  return { events: result.data, loading: result.loading, error: result.error, reload: result.reload };
 }

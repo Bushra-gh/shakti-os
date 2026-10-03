@@ -1,4 +1,6 @@
 import { accessToken } from "./supabase";
+import { apiUrl, apiConfigurationError } from "./config";
+export { apiUrl } from "./config";
 
 export type Incident = {
   id: string;
@@ -95,8 +97,6 @@ export type Integrations = {
   };
 };
 
-export const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
 export class ApiError extends Error {
   status: number;
   detail: string;
@@ -122,19 +122,22 @@ async function throwForStatus(response: Response, fallback: string): Promise<nev
 }
 
 export function websocketUrl(path: string): string {
+  if (apiConfigurationError) throw new Error(apiConfigurationError);
   return `${apiUrl.replace(/^http/, "ws")}${path}`;
 }
 
 /** Authenticated API fetch using the current live Supabase session. */
 export async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
+  if (apiConfigurationError) throw new Error(apiConfigurationError);
   const token = await accessToken();
   const headers = new Headers(init?.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
   return fetch(url, { ...init, headers });
 }
 
-/** Public, sanitized landing-page overview. Never includes event payloads. */
+/** Optional public overview client. The permanently static landing never calls it. */
 export async function getOverview(): Promise<PublicOverview> {
+  if (apiConfigurationError) throw new Error(apiConfigurationError);
   const response = await fetch(`${apiUrl}/public/overview`, { cache: "no-store" });
   if (!response.ok) await throwForStatus(response, "Public overview request failed");
   return response.json();
@@ -167,13 +170,15 @@ export async function getEvents(): Promise<Event[]> {
 export async function getIncidentEvents(incidentId: string): Promise<Event[]> {
   const response = await apiFetch(`${apiUrl}/incidents/${incidentId}/events`);
   if (!response.ok) await throwForStatus(response, "Incident events request failed");
-  return response.json();
+  const events = await response.json() as Event[];
+  return events.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 }
 
 export async function getTimeline(incidentId: string): Promise<TimelineEntry[]> {
   const response = await apiFetch(`${apiUrl}/incidents/${incidentId}/timeline?limit=100`);
   if (!response.ok) await throwForStatus(response, "Timeline request failed");
-  return response.json();
+  const entries = await response.json() as TimelineEntry[];
+  return entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 }
 
 export async function getVenues(): Promise<Venue[]> {

@@ -14,6 +14,7 @@ export function subscribeWithReconnect(
 ): () => void {
   let socket: WebSocket | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let handshakeTimer: ReturnType<typeof setTimeout> | undefined;
   let stopped = false;
   let attempt = 0;
   let connecting = false;
@@ -46,8 +47,16 @@ export function subscribeWithReconnect(
       return;
     }
 
-    const nextSocket = new WebSocket(url);
+    let nextSocket: WebSocket;
+    try {
+      nextSocket = new WebSocket(url);
+    } catch {
+      schedule();
+      return;
+    }
     socket = nextSocket;
+    // An open transport without an auth acknowledgement is not a live stream.
+    handshakeTimer = setTimeout(() => nextSocket.close(), 10_000);
     let authenticated = false;
     nextSocket.onopen = () => {
       if (stopped || socket !== nextSocket) return;
@@ -60,6 +69,8 @@ export function subscribeWithReconnect(
           if (JSON.parse(message.data).type !== "authenticated") return;
         } catch { return; }
         authenticated = true;
+        clearTimeout(handshakeTimer);
+        handshakeTimer = undefined;
         attempt = 0;
         onState("LIVE");
         return;
@@ -68,7 +79,10 @@ export function subscribeWithReconnect(
     };
     nextSocket.onerror = () => nextSocket.close();
     nextSocket.onclose = () => {
-      if (socket === nextSocket) socket = undefined;
+      if (socket !== nextSocket) return;
+      clearTimeout(handshakeTimer);
+      handshakeTimer = undefined;
+      socket = undefined;
       if (stopped) return;
       schedule();
     };
@@ -80,6 +94,8 @@ export function subscribeWithReconnect(
     stopped = true;
     if (timer) clearTimeout(timer);
     timer = undefined;
+    clearTimeout(handshakeTimer);
+    handshakeTimer = undefined;
     const current = socket;
     socket = undefined;
     current?.close();

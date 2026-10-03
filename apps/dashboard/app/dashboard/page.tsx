@@ -79,7 +79,7 @@ export default function DashboardPage() {
             )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Live incidents, signals, and system status.
+            Recent snapshot of up to 200 incidents and 200 signals; stream status is not source health.
           </p>
         </div>
         <SignalDialog onCreated={prependEvent} venues={venues} />
@@ -89,7 +89,7 @@ export default function DashboardPage() {
         <Card className="mb-4 rounded-xl bg-card ring-0">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
             <p className="text-sm font-medium text-destructive">
-              API unavailable. Start the ShaktiOS API to connect live operations.
+              Operational data unavailable or stale. Check the configured API and connection, then retry.
             </p>
             <button
               type="button"
@@ -102,7 +102,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Key indicators">
+      {!error && <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Key indicators">
         {loading
           ? [0, 1, 2, 3].map((i) => <CardSkeleton key={i} />)
           : [
@@ -122,7 +122,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             ))}
-      </section>
+      </section>}
 
       {!loading && !error && topRisk && (
         <section aria-label="Highest risk incident" className="mt-4">
@@ -189,7 +189,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="p-0">
             {loading && <p className="px-6 py-8 text-sm text-muted-foreground">Loading operational data…</p>}
-            {!loading && !active.length && (
+            {!loading && !error && !active.length && (
               <div className="px-6 py-10 text-center">
                 <CheckCircle2 className="mx-auto size-6 text-success" aria-hidden />
                 <p className="mt-3 font-medium">No active incidents</p>
@@ -255,6 +255,8 @@ export default function DashboardPage() {
               <TabsContent value="incidents">
                 {loading ? (
                   <p className="py-8 text-sm text-muted-foreground">Loading…</p>
+                ) : error ? (
+                  <ErrorState onRetry={refresh} />
                 ) : incidents.length === 0 ? (
                   <EmptyState title="No incidents yet" hint="Correlated events will create crowd_risk incidents here." />
                 ) : (

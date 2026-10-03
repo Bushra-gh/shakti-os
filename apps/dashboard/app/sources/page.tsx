@@ -59,7 +59,7 @@ export default function SourcesPage() {
       <div className="mb-5">
         <h1 className="text-2xl font-medium tracking-[-0.03em]">Source Intelligence</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Health, connection state, and latest activity from each source.
+          Observed activity in the latest 200 events — not connector health or connection status.
         </p>
       </div>
 
@@ -103,16 +103,15 @@ export default function SourcesPage() {
                         </p>
                       </div>
                     </div>
-                    <Badge variant="outline" className="border-success/40 text-success">
-                      <span className="mr-1.5 size-1.5 rounded-full bg-success" aria-hidden />
-                      Active
+                    <Badge variant="outline">
+                      Observed
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-3 gap-3 p-6">
                   <div>
                     <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                      Events (latest 50 retained)
+                      Events in snapshot
                     </p>
                     <p className="mt-1 text-2xl font-medium tabular-nums">{g.count}</p>
                   </div>

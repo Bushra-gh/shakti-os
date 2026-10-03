@@ -37,8 +37,6 @@ export default function MapPage() {
     [filtered, selectedId],
   );
 
-  const active = useMemo(() => filtered.filter((i) => i.status !== "RESOLVED"), [filtered]);
-
   return (
     <OperatorShell>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
@@ -84,7 +82,7 @@ export default function MapPage() {
         <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
           <Card className="overflow-hidden rounded-xl bg-card py-0 ring-0">
             <CardContent className="p-0">
-              <SituationMap incidents={active} venues={venues} />
+              <SituationMap incidents={filtered} venues={venues} />
             </CardContent>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border px-6 py-3.5 text-xs text-muted-foreground">
               <span className="font-medium">Legend:</span>
@@ -99,7 +97,7 @@ export default function MapPage() {
                 </span>
               ))}
               <span className="ml-auto hidden sm:inline">
-                Coordinates are plotted only when returned by the API or venue registry.
+                Only records with API or registered zone coordinates are plotted.
               </span>
             </div>
           </Card>
@@ -131,9 +129,7 @@ export default function MapPage() {
                         {riskPercent(selected.risk)}% risk
                       </span>
                     </div>
-                    <Link href={`/incidents/${selected.id}`}>
-                      <Button className="w-full rounded-lg font-medium">Open incident</Button>
-                    </Link>
+                    <Button render={<Link href={`/incidents/${selected.id}`} />} nativeButton={false} className="w-full rounded-lg font-medium">Open incident</Button>
                   </>
                 ) : (
                   <EmptyState title="Nothing selected" hint="Incidents matching the filters will appear here." />
@@ -146,7 +142,7 @@ export default function MapPage() {
             <Card className="rounded-xl bg-card py-0 ring-0">
               <CardHeader className="px-5 pt-5 pb-0">
                 <CardTitle className="text-base font-medium">
-                  Plotted incidents ({filtered.length})
+                  Matching incidents ({filtered.length})
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-1 p-3">
