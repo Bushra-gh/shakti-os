@@ -1,3 +1,4 @@
+import math
 from typing import Any
 
 from shaktios_api.incident_models import IncidentSeverity
@@ -17,7 +18,8 @@ def bounded(value: float) -> float:
 
 def numeric(value: object, fallback: float = 0.0) -> float:
     try:
-        return float(value)
+        result = float(value)
+        return result if math.isfinite(result) else fallback
     except (TypeError, ValueError):
         return fallback
 

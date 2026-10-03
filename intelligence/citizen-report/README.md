@@ -7,6 +7,7 @@ from citizen_report import CitizenReportAdapter
 
 event = CitizenReportAdapter().to_event({
     "location": "hackspire26_sonarpur_registration",
+    "venue_event_id": "venue-hackspire26-sonarpur",
     "description": "Demo observation: queue is blocking the entrance.",
     "category": "crowd",
     "urgency": "high",
@@ -14,7 +15,7 @@ event = CitizenReportAdapter().to_event({
 })
 ```
 
-**Normalization is not a complete current submission flow.** This adapter does not preserve `venue_event_id`, and its legacy `send_event(report, api_url)` does not accept/send a bearer token. That helper cannot satisfy the current API's authenticated citizen/registered-venue requirements without a caller/integration update. Supplying identity fields in the input is not a workaround.
+Normalization requires `venue_event_id` and preserves it in the payload. To submit, call `await adapter.send_event(report, api_url, access_token=verified_supabase_access_token)`. The keyword token is mandatory and sent only as `Authorization: Bearer ...`; never use the machine-ingestion key for a citizen. HTTPS is required except for loopback development; redirects and environment proxies are disabled. FastAPI validates the registered active/upcoming venue/zone, normalizes citizen source to `citizen_app` and stamps the JWT identity. Input identity fields are never forwarded.
 
 The sibling mobile app constructs its own authenticated request; it does not call this Python adapter. For a valid submission use the [API contract](../../docs/API.md#event-submission): a verified session, selected venue ID and one of that venue's zone IDs. FastAPI stamps ownership and computes the incident association.
 

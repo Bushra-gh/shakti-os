@@ -68,6 +68,7 @@ def test_webhook_transport_error_is_safe_and_never_retried(client, monkeypatch, 
 
 def test_negative_acknowledgement_is_not_recorded_as_accepted(client, monkeypatch, caplog):
     monkeypatch.setenv("N8N_WEBHOOK_URL", WEBHOOK)
+    monkeypatch.setenv("N8N_WEBHOOK_SECRET", SECRET)
     incident = prepare_responding_incident(client)
     mock = AsyncMock()
     mock.__aenter__.return_value.post.return_value = httpx.Response(

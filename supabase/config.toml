@@ -2,8 +2,7 @@
 # Database schema is managed exclusively through supabase/migrations/.
 # Do NOT create a competing schema-management system (no Alembic).
 
-[project]
-name = "shaktios"
+project_id = "shaktios"
 # Linked via: supabase link --project-ref <SUPABASE_PROJECT_REF>
 
 [db]

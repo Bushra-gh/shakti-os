@@ -325,6 +325,8 @@ def build_social_signal(
     posts: list[dict[str, Any]] | None = None,
     location: str = "Gate 4",
     platform: str = "multi",
+    *,
+    use_provider: bool = False,
 ) -> dict[str, Any]:
     """Run Civic-Shield analysis on posts and produce a signal dict.
 
@@ -337,7 +339,7 @@ def build_social_signal(
     sentiments = []
     emotions = []
     for post in posts:
-        result = analyze_sentiment_and_emotion(post["text"])
+        result = analyze_sentiment_and_emotion(post["text"]) if use_provider else dict(_SENTIMENT_FALLBACK)
         sentiments.append(result["sentiment"])
         emotions.append(result["emotion"])
 
@@ -383,7 +385,8 @@ def build_social_signal(
     platform_str = ", ".join(sorted(platform_set)) if len(platform_set) > 1 else (list(platform_set)[0] if platform_set else platform)
 
     return {
-        "location": primary_region,
+        # Region inferred from author bios must not replace the canonical zone.
+        "location": location,
         "region": primary_region,
         "mention_count": mention_count,
         "sentiment": dominant_sentiment,
@@ -393,7 +396,7 @@ def build_social_signal(
         "avg_tone": -2.5 if dominant_sentiment == "negative" else (2.5 if dominant_sentiment == "positive" else 0.0),
         "tone": -2.5 if dominant_sentiment == "negative" else (2.5 if dominant_sentiment == "positive" else 0.0),
         "sample_headline": headline,
-        "query_used": f"gate_4_crowd_monitoring",
+        "query_used": f"{location}_crowd_monitoring",
         "platform": platform_str,
         "trend_status": trend_status,
         "confidence": confidence,

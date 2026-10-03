@@ -6,12 +6,15 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from shaktios_api.auth import AuthUser, AuthError, get_current_user, get_operator_user, get_optional_user, is_operator, verify_token
+from shaktios_api.auth import AuthUser, AuthError, get_current_user, get_operator_user, get_optional_user, is_operator, require_machine_key, verify_token
+from shaktios_api.config import app_env, validate_config
 from shaktios_api.database import create_tables, get_db
 from shaktios_api.event_store import EventRecord, list_events, save_event
 from shaktios_api.incident_models import ActionDelivery, Incident, IncidentAction, IncidentStatus, IncidentStatusUpdate
@@ -30,12 +33,22 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    create_tables()
+    validate_config()
+    if app_env() != "production":
+        create_tables()
     yield
 
 
 app = FastAPI(title="ShaktiOS API", version="0.1.0", lifespan=lifespan)
 app.include_router(voice_router)
+
+
+@app.exception_handler(SQLAlchemyError)
+async def database_failure(_, error: SQLAlchemyError) -> JSONResponse:
+    # DB exceptions can contain SQL parameters/private reports/connection URLs.
+    logger.warning("database_operation_failed: kind=%s", type(error).__name__)
+    return JSONResponse(status_code=503, content={"detail": "Database operation failed; no success was confirmed"})
+
 
 def cors_origins() -> list[str]:
     raw = os.getenv("CORS_ORIGINS", "http://localhost:3000").strip()
@@ -74,9 +87,13 @@ async def ingest_event(
     event: Event,
     db: Session = Depends(get_db),
     user: AuthUser | None = Depends(get_optional_user),
+    machine_key: str | None = Header(default=None, alias="X-ShaktiOS-Ingestion-Key"),
 ) -> Event:
-    if event.source.startswith("dashboard") and (user is None or not is_operator(user)):
-        raise HTTPException(status_code=403, detail="Operator access required")
+    dashboard_source = event.source.strip().lower().startswith("dashboard")
+    if dashboard_source:
+        if user is None or not is_operator(user):
+            raise HTTPException(status_code=403, detail="Operator access required")
+        event.source = "dashboard_observation"
     if event.type == "citizen_report":
         if user is None:
             raise HTTPException(status_code=401, detail="Authentication required for citizen reports")
@@ -84,25 +101,40 @@ async def ingest_event(
         if not isinstance(venue_id, str) or not venue_id:
             raise HTTPException(status_code=422, detail="venue_event_id is required for citizen reports")
         venue = get_venue(db, venue_id)
-        if venue is None or event.location not in {zone.id for zone in venue.zones}:
-            raise HTTPException(status_code=422, detail="Report location must be a zone in the selected venue")
+        if venue is None or venue.status not in {"active", "upcoming"} or event.location not in {zone.id for zone in venue.zones}:
+            raise HTTPException(status_code=422, detail="Report location must be a zone in an active or upcoming venue")
+        if not dashboard_source:
+            event.source = "citizen_app"
         sanitized = {k: v for k, v in event.payload.items() if k not in _UNTRUSTED_IDENTITY_KEYS}
         event.payload = sanitized
         # Server-authoritative attribution from the verified JWT subject.
         event.reporter_id = user.id
     else:
+        if not dashboard_source:
+            if user is not None:
+                raise HTTPException(status_code=403, detail="Use an operator dashboard source or machine ingestion credentials without a user token")
+            require_machine_key(machine_key)
+            if event.source.strip().lower() in {"citizen_app", "citizen_report", "expo_app", "public_app", "seed_citizen_report"}:
+                raise HTTPException(status_code=422, detail="Citizen sources require citizen_report type and user authentication")
         event.reporter_id = None
     # Correlation is server-owned; a client cannot link to a chosen incident.
     event.incident_id = None
     if db.get(EventRecord, event.id) is not None:
         raise HTTPException(status_code=409, detail="Event ID already exists")
-    persisted_event = save_event(db, event)
-    event_record = db.get(EventRecord, persisted_event.id)
-    incident = None
-    if event_record is not None:
-        incident = correlate_event(db, persisted_event, event_record)
+    try:
+        persisted_event = save_event(db, event)
+        event_record = db.get(EventRecord, persisted_event.id)
+        incident = correlate_event(db, persisted_event, event_record) if event_record is not None else None
+        if incident is not None:
+            persisted_event.incident_id = incident.id
+        # Event, risk, correlation and timeline succeed or roll back together.
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        if db.get(EventRecord, event.id) is not None:
+            raise HTTPException(status_code=409, detail="Event ID already exists") from None
+        raise HTTPException(status_code=503, detail="Event could not be stored") from None
     if incident is not None:
-        persisted_event.incident_id = incident.id
         await incident_connections.broadcast(incident)
     await event_connections.broadcast(persisted_event)
     logger.info("event_received", extra={"event_id": persisted_event.id, "event_type": persisted_event.type})
@@ -134,6 +166,8 @@ async def incident_updates(websocket: WebSocket) -> None:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
+        pass
+    finally:
         incident_connections.disconnect(websocket)
 
 
@@ -146,6 +180,8 @@ async def event_updates(websocket: WebSocket) -> None:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
+        pass
+    finally:
         event_connections.disconnect(websocket)
 
 
@@ -273,7 +309,7 @@ def get_incident_by_id(
 @app.get("/incidents/{incident_id}/timeline", response_model=list[TimelineEntry])
 def get_incident_timeline(
     incident_id: str,
-    limit: int = Query(default=100, ge=1),
+    limit: int = Query(default=100, ge=1, le=200),
     db: Session = Depends(get_db),
     _: AuthUser = Depends(get_operator_user),
 ) -> list[TimelineEntry]:
@@ -308,8 +344,13 @@ async def update_incident_status(
             detail=f"Cannot transition incident from {current_status} to {update.status}",
         )
 
-    record.status = update.status.value
-    record.updated_at = datetime.now(timezone.utc)
+    changed_at = datetime.now(timezone.utc)
+    changed = db.query(IncidentRecord).filter(
+        IncidentRecord.id == incident_id, IncidentRecord.status == current_status.value,
+    ).update({"status": update.status.value, "updated_at": changed_at}, synchronize_session=False)
+    if changed != 1:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Incident changed concurrently; refresh before retrying")
     details: dict[str, object] = {
         "from_status": current_status.value,
         "to_status": update.status.value,
@@ -323,7 +364,7 @@ async def update_incident_status(
         db,
         incident_id,
         "status.changed",
-        record.updated_at,
+        changed_at,
         details,
     )
     db.commit()
@@ -349,11 +390,12 @@ async def request_incident_action(
         raise HTTPException(status_code=409, detail="Incident must be RESPONDING before requesting an action")
 
     webhook_url = os.getenv("N8N_WEBHOOK_URL", "").strip()
-    if not webhook_url:
+    webhook_secret = os.getenv("N8N_WEBHOOK_SECRET", "").strip()
+    if not webhook_url or not webhook_secret:
         raise HTTPException(
             status_code=503,
             detail=(
-                "N8N_WEBHOOK_URL is not configured. Start FastAPI with "
+                "N8N_WEBHOOK_URL and N8N_WEBHOOK_SECRET must both be configured. Start FastAPI with "
                 "--env-file ../../.env or export the variable in the API process."
             ),
         )
@@ -368,12 +410,20 @@ async def request_incident_action(
         "note": action.note,
         "incident": incident.model_dump(mode="json"),
     }
-    webhook_headers = {"Content-Type": "application/json"}
-    webhook_secret = os.getenv("N8N_WEBHOOK_SECRET", "").strip()
-    if webhook_secret:
-        webhook_headers["X-ShaktiOS-Webhook-Secret"] = webhook_secret
+    webhook_headers = {"Content-Type": "application/json", "X-ShaktiOS-Webhook-Secret": webhook_secret}
+    # A durable attempt exists even if the remote side accepts and the response
+    # or final DB write is lost. This is an audit trail, not exactly-once delivery.
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        add_timeline_entry(db, incident_id, "action.attempted", datetime.now(timezone.utc), {
+            "action_id": action_id, "action_type": action.type,
+            "operator_id": operator.id, "delivery": "unconfirmed",
+        })
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Could not record the action attempt; no webhook was sent") from None
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=False, trust_env=False) as client:
             response = await client.post(webhook_url, json=payload, headers=webhook_headers)
             response.raise_for_status()
             try:
@@ -381,7 +431,14 @@ async def request_incident_action(
             except ValueError:
                 webhook_result = None
             if isinstance(webhook_result, dict) and webhook_result.get("ok") is False:
-                raise HTTPException(status_code=502, detail="Action webhook rejected the payload")
+                raise HTTPException(status_code=502, detail="Action webhook rejected the payload; check n8n Executions before retrying")
+            if not (
+                isinstance(webhook_result, dict) and webhook_result.get("ok") is True
+                and webhook_result.get("status") == "accepted"
+                and webhook_result.get("action_id") == action_id
+                and webhook_result.get("incident_id") == incident_id
+            ):
+                raise HTTPException(status_code=502, detail="Action acknowledgement is invalid or mismatched. Check n8n Executions before retrying; the workflow may already have executed")
     except HTTPException:
         raise
     except httpx.HTTPError as error:
@@ -445,7 +502,11 @@ async def request_incident_action(
         details["operator_email"] = operator.email
     if action.note:
         details["note"] = action.note
-    add_timeline_entry(db, incident_id, "action.requested", datetime.now(timezone.utc), details)
-    db.commit()
+    try:
+        add_timeline_entry(db, incident_id, "action.requested", datetime.now(timezone.utc), details)
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=502, detail="n8n accepted the action but its acknowledgement could not be recorded. Check n8n Executions and the action.attempted timeline entry before retrying") from None
     await incident_connections.broadcast(incident)
     return ActionDelivery(action_id=action_id, status="accepted", incident=incident)

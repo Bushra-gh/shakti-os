@@ -66,6 +66,7 @@ def correlate_event(db: Session, event: Event, event_record: EventRecord) -> Inc
             IncidentRecord.updated_at <= event.timestamp,
         )
         .order_by(IncidentRecord.updated_at.desc())
+        .with_for_update()
         .first()
     )
 
@@ -115,7 +116,7 @@ def correlate_event(db: Session, event: Event, event_record: EventRecord) -> Inc
             "severity": incident.severity,
         },
     )
-    db.commit()
+    db.flush()
     db.refresh(incident)
     return to_incident(incident)
 

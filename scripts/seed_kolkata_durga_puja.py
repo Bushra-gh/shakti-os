@@ -23,6 +23,8 @@ from pathlib import Path
 
 import httpx
 
+from demo_safety import machine_headers
+
 FIXTURE = Path(__file__).with_name("kolkata_durga_puja_events.json")
 API_URL = os.getenv("SHAKTIOS_API_URL", "http://localhost:8000").rstrip("/")
 
@@ -37,34 +39,44 @@ def load_events() -> list[dict]:
 
 def to_api_event(entry: dict) -> tuple[str, dict]:
     """Strip the human-readable moment label into payload for the API."""
+    entry = dict(entry)
+    if entry.get("type") == "citizen_report":
+        raise ValueError("Legacy citizen fixtures cannot be submitted as authenticated users; use seed_supabase.py")
     moment = entry.pop("moment", "")
     payload = dict(entry.get("payload", {}))
     if moment and "moment" not in payload:
         payload["moment"] = moment
-    return moment, {**entry, "payload": payload}
+    payload["is_seeded"] = True
+    return moment, {**entry, "source": f"seed_{entry['source']}", "payload": payload}
 
 
-def seed_events(limit: int = 0, dry_run: bool = False) -> int:
+def seed_events(limit: int = 0, dry_run: bool = True) -> int:
+    if limit < 0:
+        raise ValueError("limit cannot be negative")
     entries = load_events()
+    skipped = sum(entry.get("type") == "citizen_report" for entry in entries)
+    entries = [entry for entry in entries if entry.get("type") != "citizen_report"]
+    print(f"Skipping {skipped} legacy citizen fixtures: never impersonate a citizen.")
     if limit > 0:
         entries = entries[:limit]
-    print(f"Kolkata Durga Puja seed: {len(entries)} events -> {API_URL} ...")
+    print(f"Kolkata Durga Puja seed: {len(entries)} labelled machine events ...")
     posted = 0
     if dry_run:
         for entry in entries:
             moment, event = to_api_event(dict(entry))
             print(f"  [dry-run] {event['type']} @ {event['location']} :: {moment}")
         return len(entries)
-    with httpx.Client(timeout=10.0) as client:
+    headers = machine_headers(API_URL)
+    with httpx.Client(timeout=10.0, follow_redirects=False, trust_env=False) as client:
         for i, entry in enumerate(entries):
             moment, event = to_api_event(dict(entry))
             try:
-                resp = client.post(f"{API_URL}/events", json=event)
+                resp = client.post(f"{API_URL}/events", json=event, headers=headers)
                 resp.raise_for_status()
                 posted += 1
                 print(f"  [{i + 1}/{len(entries)}] {event['type']} @ {event['location']} :: {moment}")
-            except httpx.HTTPError as exc:
-                print(f"  [{i + 1}/{len(entries)}] FAILED {event.get('location')}: {exc}")
+            except httpx.HTTPError:
+                raise RuntimeError("Seed stopped after a failed request; earlier events may be stored. No automatic retries.") from None
             time.sleep(0.1)
     print(f"Done. Posted {posted}/{len(entries)} Kolkata events.")
     return posted
@@ -72,11 +84,13 @@ def seed_events(limit: int = 0, dry_run: bool = False) -> int:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Seed Kolkata Durga Puja dummy events")
-    parser.add_argument("--dry-run", action="store_true", help="Print events without sending")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--dry-run", action="store_true", help="Print events without sending (default)")
+    mode.add_argument("--apply", action="store_true", help="Explicitly store synthetic machine fixtures")
     parser.add_argument("--limit", type=int, default=0, help="Only post first N events (0 = all)")
     args = parser.parse_args()
     try:
-        seed_events(limit=args.limit, dry_run=args.dry_run)
-    except (OSError, ValueError) as exc:
+        seed_events(limit=args.limit, dry_run=not args.apply)
+    except (OSError, ValueError, RuntimeError) as exc:
         print(f"Seed failed: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc

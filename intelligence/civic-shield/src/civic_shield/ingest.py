@@ -15,7 +15,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import sys
+import os
 
 from civic_shield.adapter import CivicShieldAdapter
 from civic_shield.bridge import build_social_signal, generate_demo_posts
@@ -26,8 +26,11 @@ def main() -> None:
     parser.add_argument("--location", default="Gate 4", help="Location for the scenario")
     parser.add_argument("--count", type=int, default=12, help="Number of demo posts")
     parser.add_argument("--negative-ratio", type=float, default=0.5, help="Ratio of negative posts")
-    parser.add_argument("--api-url", default="http://localhost:8000", help="ShaktiOS API base URL")
-    parser.add_argument("--local", action="store_true", help="Print event JSON without sending")
+    parser.add_argument("--api-url", default=os.getenv("SHAKTIOS_API_URL", "http://localhost:8000"), help="ShaktiOS API base URL")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--local", action="store_true", help="Print event JSON without sending (default)")
+    mode.add_argument("--send", action="store_true", help="Explicitly store this synthetic signal via the API")
+    parser.add_argument("--use-provider", action="store_true", help="Explicitly allow optional Groq calls for synthetic text")
     args = parser.parse_args()
 
     print(f"[bridge] Generating {args.count} demo posts for '{args.location}'...")
@@ -38,7 +41,8 @@ def main() -> None:
     )
 
     print("[bridge] Running sentiment, trend, credibility analysis...")
-    signal = build_social_signal(posts=posts, location=args.location)
+    signal = build_social_signal(posts=posts, location=args.location, use_provider=args.use_provider)
+    signal["is_seeded"] = True
 
     print(f"[bridge] Dominant sentiment: {signal['sentiment']}  emotion: {signal['emotion']}")
     print(f"[bridge] Velocity: {signal['velocity']:.2f}  mentions: {signal['mention_count']}")
@@ -50,12 +54,15 @@ def main() -> None:
     print("\n[normalized event]")
     print(json.dumps(event, indent=2))
 
-    if args.local:
-        print("\n[local mode] Event not sent. Use without --local to POST to ShaktiOS.")
+    if not args.send:
+        print("\n[local mode] Event not sent. Use --send to POST to ShaktiOS.")
         return
 
-    print(f"\n[send] POSTing to {args.api_url}/events ...")
-    result = asyncio.run(adapter.send_event(signal, args.api_url))
+    print("\n[send] POSTing synthetic event to configured API ...")
+    try:
+        result = asyncio.run(adapter.send_event(signal, args.api_url))
+    except (RuntimeError, ValueError) as error:
+        parser.error(str(error))
     print(f"[send] Response: {json.dumps(result, indent=2)}")
 
 

@@ -20,10 +20,11 @@ or needed by this module.
 from __future__ import annotations
 
 import os
+import secrets
 from functools import lru_cache
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
@@ -101,17 +102,27 @@ def verify_token(token: str) -> AuthUser:
 
 
 def get_optional_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> AuthUser | None:
     """Return the verified user, or None for anonymous requests.
 
-    Machine signal sources (crowd simulator, civic-shield bridge, vision)
-    send no token. A present-but-invalid token is rejected with 401 so a
-    broken client cannot silently degrade to anonymous.
+    Machine sources use a separate ingestion credential. A present-but-invalid
+    Authorization header is never allowed to silently degrade to anonymous.
     """
     if credentials is None or not credentials.credentials:
+        if request.headers.get("Authorization") is not None:
+            raise AuthError()
         return None
     return verify_token(credentials.credentials)
+
+
+def require_machine_key(value: str | None) -> None:
+    expected = os.getenv("SHAKTIOS_INGESTION_KEY", "").strip()
+    if not expected:
+        raise HTTPException(status_code=503, detail="Machine ingestion is not configured")
+    if not value or not secrets.compare_digest(value.encode(), expected.encode()):
+        raise HTTPException(status_code=401, detail="Valid machine ingestion credentials required")
 
 
 def is_operator(user: AuthUser) -> bool:

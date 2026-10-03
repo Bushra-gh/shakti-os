@@ -25,12 +25,12 @@ The adapter does not fetch social data or make incident-risk decisions. Use the 
 ```bash
 # From this package, after installation in its own environment:
 python -m civic_shield.ingest --location hackspire26_sonarpur_registration --local
-# Omit --local only when a stored demo event is intended:
-python -m civic_shield.ingest --location hackspire26_sonarpur_registration --api-url http://localhost:8000
+# Export server-only SHAKTIOS_INGESTION_KEY, then explicitly opt into a stored demo:
+python -m civic_shield.ingest --location hackspire26_sonarpur_registration --api-url http://localhost:8000 --send
 ```
 
-`--local` prevents the final ShaktiOS POST, **not** all possible provider calls: if `GROQ_API_KEY` and the optional Groq client are available, analysis can call Groq. Without usable provider configuration it falls back to neutral sentiment. Keep provider keys server-side and avoid private text in demonstrations.
+Default/`--local` prints only; `--send` opts into posting labelled synthetic data. Optional Groq calls require a separate explicit `--use-provider` flag plus `GROQ_API_KEY` and the optional Groq client. Without that opt-in the demo uses neutral fallback even if a developer key exists. Keep provider keys server-side and avoid private text in demonstrations. The canonical `--location` is retained for correlation; author-bio region inference does not replace it.
 
-This package does not supply deployed social-source fetching/scheduling. Anonymous non-citizen ingestion is a local-MVP API exception, not production connector authentication.
+This package does not supply deployed social-source fetching/scheduling. `send_event` requires server-only `SHAKTIOS_INGESTION_KEY` and sends it as `X-ShaktiOS-Ingestion-Key`. The API fails closed without it. HTTPS is required except for loopback development; redirects/environment proxies are disabled and transport exceptions omit URLs/credentials.
 
 Install `.[test]` in this package's virtual environment and run `python -m pytest` for adapter tests. See the [API contract](../../docs/API.md) and [contribution checks](../../docs/CONTRIBUTING.md).

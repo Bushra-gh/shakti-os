@@ -231,6 +231,9 @@ def main() -> None:
         print("Existing deterministic IDs are skipped. No Auth users, private reports, contacts, or webhook calls.")
         return
     from shaktios_api.database import SessionLocal, engine
+    from shaktios_api.config import app_env
+    if app_env() != "development":
+        raise SystemExit("Demo seeding is allowed only with APP_ENV=development; never seed production.")
     if engine.dialect.name != "postgresql":
         raise SystemExit("Use the configured Supabase PostgreSQL DATABASE_URL to apply this seed.")
     try:

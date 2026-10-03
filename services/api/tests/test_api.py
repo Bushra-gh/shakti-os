@@ -26,7 +26,8 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     app.dependency_overrides[get_operator_user] = lambda: AuthUser(
         id="operator-test", email="operator@example.com", role="operator"
     )
-    with TestClient(app) as test_client:
+    monkeypatch.setenv("SHAKTIOS_INGESTION_KEY", "test-only-ingestion-key-at-least-32-characters")
+    with TestClient(app, headers={"X-ShaktiOS-Ingestion-Key": "test-only-ingestion-key-at-least-32-characters"}) as test_client:
         with SessionLocal() as db:
             db.query(EventRecord).delete()
             db.query(IncidentRecord).delete()
@@ -379,7 +380,11 @@ def test_action_posts_to_n8n_and_records_timeline(
     response_mock = MagicMock()
     response_mock.raise_for_status.return_value = None
     client_mock = AsyncMock()
-    client_mock.__aenter__.return_value.post.return_value = response_mock
+    async def acknowledge(*args, **kwargs):
+        sent = kwargs["json"]
+        response_mock.json.return_value = {"ok": True, "status": "accepted", "action_id": sent["action_id"], "incident_id": sent["incident"]["id"]}
+        return response_mock
+    client_mock.__aenter__.return_value.post.side_effect = acknowledge
 
     with patch("shaktios_api.main.httpx.AsyncClient", return_value=client_mock):
         response = client.post(

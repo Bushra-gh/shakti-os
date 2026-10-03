@@ -52,7 +52,7 @@ Then click **Review & approve → Approve action**. A successful result should:
 
 ## Troubleshooting failed approval handoffs
 
-If FastAPI returns `503`, `N8N_WEBHOOK_URL` is missing. A `502` means the API did not receive a successful n8n acknowledgement; it does **not** prove the workflow never ran. The dashboard now includes a specific, sanitized diagnostic:
+If FastAPI returns `503`, either `N8N_WEBHOOK_URL`/`N8N_WEBHOOK_SECRET` is missing or the API could not persist the pre-send audit. Both settings are required in every environment. With `APP_ENV=production`, the URL must use HTTPS and the secret must be at least32 characters. A `502` means the API did not receive a successful n8n acknowledgement; it does **not** prove the workflow never ran. The dashboard now includes a specific, sanitized diagnostic:
 
 | Diagnostic | What to check |
 | --- | --- |
@@ -66,6 +66,6 @@ If FastAPI returns `503`, `N8N_WEBHOOK_URL` is missing. A `502` means the API di
 
 After changing `N8N_WEBHOOK_URL` or `N8N_WEBHOOK_SECRET`, restart FastAPI. Do not change the Supabase JWT key; it is unrelated to n8n Header Auth.
 
-Inspect n8n execution history for the incident ID/action before retrying. There is no automatic retry or exactly-once delivery guarantee. A failed handoff does not resolve the incident or create a successful `action.requested` timeline entry. If an execution already succeeded, verify its outcome before submitting another approval.
+Inspect n8n execution history for the incident ID/action before retrying. There is no automatic retry or exactly-once delivery guarantee. A failed handoff does not resolve the incident or create a successful `action.requested` timeline entry. A durable `action.attempted` entry with action ID and `delivery: unconfirmed` is stored before HTTP; it remains for reconciliation on failure. The API requires JSON `{ok:true,status:"accepted",action_id,incident_id}` matching the sent IDs, not an arbitrary HTTP200 page. If the final acknowledgement DB write fails, the API reports that n8n accepted but local recording failed; do not blindly retry. If an execution already succeeded, verify its outcome before submitting another approval.
 
 `GET /healthz` on the n8n host can confirm basic reachability without sending a webhook. A healthy server does not prove this particular workflow is active or that Header Auth is correct. The API's `/integrations` endpoint likewise reports configuration presence, not a live delivery test.

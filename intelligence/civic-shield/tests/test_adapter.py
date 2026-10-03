@@ -49,7 +49,8 @@ def test_civic_shield_adapter_requires_location() -> None:
         CivicShieldAdapter().to_event({"mention_count": 2})
 
 
-def test_civic_shield_adapter_sends_normalized_event() -> None:
+def test_civic_shield_adapter_sends_normalized_event(monkeypatch) -> None:
+    monkeypatch.setenv("SHAKTIOS_INGESTION_KEY", "test-machine-key")
     response = MagicMock()
     response.json.return_value = {"id": "event-1"}
     client = AsyncMock()
@@ -60,6 +61,23 @@ def test_civic_shield_adapter_sends_normalized_event() -> None:
         result = asyncio.run(CivicShieldAdapter().send_event(signal, "http://localhost:8000/"))
 
     client.__aenter__.return_value.post.assert_awaited_once_with(
-        "http://localhost:8000/events", json=CivicShieldAdapter().to_event(signal)
+        "http://localhost:8000/events", json=CivicShieldAdapter().to_event(signal), headers={"X-ShaktiOS-Ingestion-Key": "test-machine-key"}
     )
     assert result == {"id": "event-1"}
+
+
+def test_send_requires_machine_key_before_network(monkeypatch):
+    monkeypatch.delenv("SHAKTIOS_INGESTION_KEY", raising=False)
+    with patch("civic_shield.adapter.httpx.AsyncClient") as client:
+        with pytest.raises(RuntimeError, match="SHAKTIOS_INGESTION_KEY"):
+            asyncio.run(CivicShieldAdapter().send_event({"location": "gate_4"}, "https://api.example.com"))
+    client.assert_not_called()
+
+
+@pytest.mark.parametrize("url", ["http://remote.example.com", "https://user:secret@api.example.com", "https://api.example.com?secret=x"])
+def test_unsafe_destinations_rejected_before_credentials_sent(monkeypatch, url):
+    monkeypatch.setenv("SHAKTIOS_INGESTION_KEY", "test-machine-key")
+    with patch("civic_shield.adapter.httpx.AsyncClient") as client:
+        with pytest.raises(ValueError, match="HTTPS"):
+            asyncio.run(CivicShieldAdapter().send_event({"location": "gate_4"}, url))
+    client.assert_not_called()

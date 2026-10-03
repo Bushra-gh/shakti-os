@@ -27,7 +27,7 @@ class EventRecord(Base):
 def save_event(db: Session, event: Event) -> Event:
     record = EventRecord(**event.model_dump())
     db.add(record)
-    db.commit()
+    db.flush()
     db.refresh(record)
     return Event.model_validate(record, from_attributes=True)
 

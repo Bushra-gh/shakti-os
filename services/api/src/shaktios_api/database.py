@@ -7,10 +7,13 @@ from sqlalchemy import Engine, create_engine, event as sa_event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# Load the monorepo root .env for local runs started from services/api or the
-# repository root. Explicit process environment variables still win, and
-# production deployments can continue to inject env vars directly.
-load_dotenv(Path(__file__).resolve().parents[4] / ".env")
+from shaktios_api.config import app_env, validate_config
+
+# Only local development may load private dotenv. Tests and production must
+# supply their environment explicitly, never inherit a developer's credentials.
+if app_env() == "development":
+    load_dotenv(Path(__file__).resolve().parents[4] / ".env")
+validate_config()
 
 
 def database_url() -> str:
@@ -85,6 +88,8 @@ class Base(DeclarativeBase):
 
 
 def create_tables() -> None:
+    if app_env() == "production":
+        raise RuntimeError("Apply Supabase SQL migrations separately; metadata creation is disabled in production")
     Base.metadata.create_all(bind=engine)
 
 
@@ -92,5 +97,8 @@ def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

@@ -50,6 +50,10 @@ CREATE TABLE IF NOT EXISTS public.events (
     reporter_id TEXT NULL
 );
 
+-- Existing pre-Auth SQLAlchemy tables need the additive ownership column before
+-- the reporter index below. CREATE TABLE IF NOT EXISTS does not add columns.
+ALTER TABLE public.events ADD COLUMN IF NOT EXISTS reporter_id TEXT NULL;
+
 -- ---------------------------------------------------------------------------
 -- incident_timeline
 -- ---------------------------------------------------------------------------

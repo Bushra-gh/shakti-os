@@ -224,12 +224,13 @@ def test_me_returns_verified_identity(
     assert response.json()["is_operator"] is False
 
 
-def test_machine_sources_stay_anonymous_and_unaffected(
+def test_machine_sources_use_separate_credential_without_citizen_identity(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
         auth_module, "verify_token", lambda token: AuthUser(id="citizen-abc")
     )
+    monkeypatch.setenv("SHAKTIOS_INGESTION_KEY", "test-machine-key")
     response = client.post(
         "/events",
         json={
@@ -239,7 +240,28 @@ def test_machine_sources_stay_anonymous_and_unaffected(
             "confidence": 0.7,
             "payload": {"velocity": 0.8},
         },
-        headers={"Authorization": "Bearer valid.token"},
+        headers={"X-ShaktiOS-Ingestion-Key": "test-machine-key"},
     )
     assert response.status_code == 201
     assert response.json()["reporter_id"] is None
+
+
+def test_user_editable_metadata_never_grants_operator(rsa_keys, monkeypatch):
+    private_pem, public_pem = rsa_keys
+    monkeypatch.setattr(auth_module, "_jwks_client", lambda: _FakeJwksClient(public_pem))
+    user = verify_token(_sign(private_pem, role="authenticated", user_metadata={"role": "admin"}))
+    assert not auth_module.is_operator(user)
+
+
+def test_trusted_app_metadata_can_grant_operator(rsa_keys, monkeypatch):
+    private_pem, public_pem = rsa_keys
+    monkeypatch.setattr(auth_module, "_jwks_client", lambda: _FakeJwksClient(public_pem))
+    user = verify_token(_sign(private_pem, role="authenticated", app_metadata={"role": "operator"}))
+    assert auth_module.is_operator(user)
+
+
+def test_wrong_audience_is_rejected(rsa_keys, monkeypatch):
+    private_pem, public_pem = rsa_keys
+    monkeypatch.setattr(auth_module, "_jwks_client", lambda: _FakeJwksClient(public_pem))
+    with pytest.raises(AuthError):
+        verify_token(_sign(private_pem, aud="untrusted-audience"))

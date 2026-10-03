@@ -1,8 +1,9 @@
 """
-Reset ShaktiOS demo data (Supabase or SQLite).
+Reset disposable SQLite test data ONLY. Never reset a shared/Supabase database.
 
 Deletes all rows in FK-safe order: incident_timeline -> events -> incidents.
-Tables are preserved; run `python -m shaktios_api.migrate` first on a fresh DB.
+Tables are preserved. Requires APP_ENV=test and an explicit SQLite DATABASE_URL.
+This deletes ALL local test rows, not merely labelled seed data.
 
 Usage (from services/api with its venv):
     .\\.venv\\Scripts\\python.exe ..\\..\\scripts\\reset_demo.py --yes
@@ -17,7 +18,7 @@ Env:
 from __future__ import annotations
 
 import argparse
-import sys
+import os
 
 from sqlalchemy import text
 
@@ -28,6 +29,10 @@ def main() -> int:
     args = parser.parse_args()
     if not args.yes:
         print("Refusing to wipe without --yes. Re-run with --yes to confirm.")
+        return 2
+
+    if os.getenv("APP_ENV", "").strip().lower() != "test" or not os.getenv("DATABASE_URL", "").startswith("sqlite"):
+        print("Refusing: reset is restricted to APP_ENV=test with an explicit disposable SQLite DATABASE_URL.")
         return 2
 
     from shaktios_api.database import build_engine, database_url

@@ -24,7 +24,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const input = $json.body ?? $json;\n\nif (!input.action_id || !input.action_type || !input.incident?.id) {\n  return [{\n    json: {\n      ok: false,\n      error: 'Invalid ShaktiOS action payload',\n      received_at: new Date().toISOString(),\n    },\n  }];\n}\n\nreturn [{\n  json: {\n    ok: true,\n    status: 'accepted',\n    action_id: input.action_id,\n    action_type: input.action_type,\n    incident_id: input.incident.id,\n    incident_location: input.incident.location,\n    incident_severity: input.incident.severity,\n    note: input.note ?? null,\n    received_at: new Date().toISOString(),\n    message: 'Human-approved action received by n8n. Connect your notification node after this step.',\n  },\n}];"
+        "jsCode": "const input = $json.body ?? $json;\n\nif (!input || typeof input.action_id !== 'string' || !input.action_id.trim() || typeof input.action_type !== 'string' || !input.action_type.trim() || input.action_type.length > 100 || typeof input.incident?.id !== 'string' || !input.incident.id.trim() || input.incident.status !== 'RESPONDING' || (input.note != null && (typeof input.note !== 'string' || input.note.length > 500))) {\n  return [{\n    json: {\n      ok: false,\n      error: 'Invalid ShaktiOS action payload',\n      received_at: new Date().toISOString(),\n    },\n  }];\n}\n\nreturn [{\n  json: {\n    ok: true,\n    status: 'accepted',\n    action_id: input.action_id,\n    action_type: input.action_type,\n    incident_id: input.incident.id,\n    incident_location: input.incident.location,\n    incident_severity: input.incident.severity,\n    note: input.note ?? null,\n    received_at: new Date().toISOString(),\n    message: 'Human-approved action received by n8n. Connect your notification node after this step.',\n  },\n}];"
       },
       "id": "validate-action",
       "name": "Validate Approved Action",
@@ -59,7 +59,7 @@
   },
   "versionId": "shaktios-action-handoff-v1",
   "meta": {
-    "templateCredsSetupCompleted": true
+    "templateCredsSetupCompleted": false
   },
   "tags": []
 }
