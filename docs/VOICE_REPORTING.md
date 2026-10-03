@@ -5,7 +5,7 @@ Voice is an optional input aid, **not an emergency dispatch or automatic submiss
 ## Backend setup
 
 1. Keep the existing Supabase database and Auth configuration (`DATABASE_URL`, `SUPABASE_URL`, JWT audience) described in [SUPABASE.md](SUPABASE.md). Have a registered venue whose status is exactly `active` or `upcoming`, with registered zones. Voice does not create or seed venues.
-2. Install the existing backend dependencies, including the new multipart parser:
+2. Install the backend dependencies, including the multipart parser:
 
    ```powershell
    cd services/api
@@ -29,7 +29,21 @@ Voice is an optional input aid, **not an emergency dispatch or automatic submiss
    .\.venv\Scripts\python.exe -m uvicorn shaktios_api.main:app --app-dir src --env-file ../../.env --reload --port 8000
    ```
 
-   Implementation/testing did not inspect or change actual `.env` values, restart an existing API, upload real recordings, or make paid Sarvam calls.
+   Restarting the API and sending real recordings are explicit runtime steps. Mocked tests do not verify the configured provider key or authorize uploading private audio.
+
+## Mobile flow and build setup
+
+The sibling Expo app implements **Report Incident → Describe by voice** alongside the existing manual form. It uses SDK-compatible `expo-audio` and `expo-file-system`, records at most 25 seconds, supports playback/re-record/discard, and requests microphone permission on demand. No background recording/playback mode is enabled.
+
+1. Choose a real registered venue and open voice reporting. The client reads `/voice/config`; missing configuration leaves manual reporting available.
+2. Record, listen if desired, explicitly consent to Sarvam processing, and tap **Process voice & preview**. Only this action uploads the multipart recording with the citizen's current JWT. The HTTP client lets fetch supply the multipart boundary.
+3. Read the original transcript and edit category, description, zone and urgency. Missing/invalid suggestions stay unselected; the client rejects mismatched-venue results. No report is submitted during processing or preview.
+4. Accept the edited preview, optionally capture device GPS, then inspect the complete review screen. A separate confirmation checkbox is required for voice-derived reports before **Submit Report**.
+5. Submission uses the existing citizen `/events` path. Only final report fields are sent; raw audio and the reference transcript are not attached. Temporary audio is cleaned up after processing, discard or leaving the screen; client-side cleanup is best effort. Session/venue changes do not reuse the old voice draft.
+
+No Sarvam credential belongs in `shaktios-app/.env`. Install dependencies with `pnpm install --frozen-lockfile` and restart Metro with `pnpm exec expo start -c`. Existing installed development/release binaries must be rebuilt to include the native audio module/permission plugin. The native config test checks that the camera plugin does not remove the audio microphone usage description.
+
+See [MVP build readiness and native acceptance checklist](../../shaktios-app/BUILD_READINESS.md). EAS preview/production profiles are supplied, but owned application identifiers, project/signing setup, a reachable HTTPS API origin and actual native builds/device validation remain separate work. The interface remains English even though speech can be in a supported language.
 
 ## API contract
 
@@ -127,19 +141,20 @@ Failures after a successful transcription normally return a **200 manual-entry d
 
 ## Verification (mocked; no real audio/provider calls)
 
-Run from `services/api` (existing Windows venv from WSL):
+From `services/api`, with its installed virtual environment active:
 
 ```bash
-.venv/Scripts/python.exe -m pytest -q tests/test_voice.py
-.venv/Scripts/python.exe -m pytest -q
-.venv/Scripts/python.exe -m compileall -q src/shaktios_api/voice.py src/shaktios_api/voice_provider.py
+python -m pytest -q tests/test_voice.py
+python -m pytest -q
 ```
 
-Verified results at implementation: **107 voice tests passed**, **167 backend tests passed**, and compileall passed. Both pytest runs emitted two existing Starlette TestClient/AnyIO deprecation warnings; no tests skipped.
+Record current results when running these commands rather than reusing a historical test count. See [CONTRIBUTING.md](CONTRIBUTING.md) for the other package checks and CI boundaries.
 
 Tests mock the HTTPX transport and use the existing isolated in-memory SQLite fixture. Coverage includes multilingual M4A/WebM flow, provider request/schema contracts, auth before body consumption, consent, venue/language validation, field counts, 5 MiB boundaries, chunked/misleading uploads, temporary-file cleanup, upload/provider deadlines, malformed/silent responses, safe upstream 401/403/429/network failures, no retries, preserved transcripts on extraction failure, invented fields/zones, prompt-injection-shaped data, local rate/concurrency guards, absence of private error/key logging, and unchanged Event/Incident/Timeline rows. The happy path additionally asserts there are no SQL writes.
 
-Real microphone permissions, actual codec acceptance/transcription quality/latency, provider-key validity and mobile preview/submission need a separately authorized device test. Passing mocked backend tests does not claim those checks were performed.
+The mobile app additionally passed **12 local tests**, TypeScript, Expo SDK/peer checks and Android/production-web exports. **Six browser flow scenarios** passed against the production export with Chromium's fake microphone and intercepted Auth/API responses: consent gates multipart upload; multilingual suggestions remain editable; final confirmation submits exactly one edited report; the 25-second cap and leaving the screen release microphone tracks; permission denial and a missing key preserve the manual alternative. The browser harness is `shaktios-app/tests/voice.browser.cjs`; no real person was recorded and no external provider/database was contacted.
+
+Real microphone permissions, actual native codec acceptance/transcription quality/latency, provider-key validity and the native mobile round trip still need a separately authorized device test. Passing mocked/backend/web checks does not claim those native/provider checks were performed.
 
 ## Official provider references
 
@@ -147,4 +162,4 @@ Real microphone permissions, actual codec acceptance/transcription quality/laten
 - [STT REST request fields, audio formats, languages and response](https://docs.sarvam.ai/api-reference-docs/speech-to-text/transcribe)
 - [Chat completion V1, model, structured outputs and reasoning controls](https://docs.sarvam.ai/api/api-guides-tutorials/chat-completion/overview)
 
-These references were read as `.md` endpoints when implementing the backend. Voice routes are in `services/api/src/shaktios_api/voice.py`; provider/extraction logic is in `voice_provider.py`. Mobile recording/UI instructions can extend this document separately.
+Voice routes are in `services/api/src/shaktios_api/voice.py`; provider/extraction logic is in `voice_provider.py`. In sibling `shaktios-app`, the entry is `app/voice-report.tsx`, recording logic is in `src/hooks/useVoiceRecorder.ts`, and preview validation is in `src/utils/voice-draft.ts`.

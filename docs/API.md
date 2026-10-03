@@ -1,36 +1,67 @@
-# API
+# API contract
 
-## Authentication and access
+Local base URL: `http://localhost:8000`. FastAPI publishes its HTTP schema at `/docs` and `/openapi.json`; WebSocket authentication is documented below. Source: `services/api/src/shaktios_api/main.py` and the `*_models.py` modules; voice routes live in `voice.py`.
 
-All operator reads (`/events`, `/incidents`, related evidence/timelines, `/integrations`) and status/action writes require `Authorization: Bearer <Supabase access token>` **and operator capability**. Missing/invalid credentials return `401`; a citizen attempting operator endpoints receives `403`. Operators are granted using `OPERATOR_USER_IDS`, `OPERATOR_EMAILS`, or trusted `app_metadata.role=operator|admin`. `GET /me` returns `{id,email,role,is_operator}`.
+## Access rules
 
-Public routes are `/health`, `/venues`, `/venues/{id}` and `/public/overview`. The overview returns database-wide counts plus field-projected incident/event summaries; it never returns report payloads or reporter identities. It includes `seeded_event_count` so clients can label seeded data.
+Send `Authorization: Bearer <Supabase access token>` on authenticated HTTP requests.
 
-### Citizen report and venue routes
+| Access | Meaning |
+| --- | --- |
+| Public | No session required; responses deliberately expose only public fields |
+| User | Any verified Supabase user; report reads are restricted to that user's ownership |
+| Operator | Verified user with operator capability; citizen sign-up does not grant it |
 
-- `GET /venues`: registered venues and canonical zones, including nullable `startTime`, `endTime`, and `helpline`.
-- `GET /venues/{id}`: a venue or `404`.
-- `GET /me/reports?limit=50&offset=0`: verified citizen's reports, filtered by ownership **before** pagination (limit 1–100).
-- `GET /me/reports/{id}`: one owned report; `404` for missing or unowned IDs.
-- Report responses include `incident_id`, `incident_status`, `report_status` and `venue_name` alongside event fields. Status follows the persisted incident: `DETECTED → received`, `ASSESSING → under_review`, `RESPONDING → action_initiated`, `RESOLVED → resolved`; no incident means `submitted`. `RESPONDING` is an operator workflow state, not confirmation that responders were dispatched.
-- `GET /incidents/{id}/events`: operator-only evidence filtered by the actual incident association, not a matching location string.
-- `GET /integrations`: operator-only n8n configuration/secret-presence flags. Configuration is not a live delivery health check.
+Missing/invalid credentials on protected routes return `401`; a verified non-operator gets `403` from operator routes. Operator capability is configured server-side through `OPERATOR_USER_IDS`, `OPERATOR_EMAILS` or trusted roles, not editable client profile metadata. See [SUPABASE.md](SUPABASE.md).
 
+`POST /events` has source/type-specific rules: citizen reports require a user, dashboard-prefixed sources require an operator, and other machine signals currently allow anonymous ingestion. A dashboard-prefixed source without operator access returns `403`. A supplied invalid bearer token is rejected rather than treated as anonymous. **Protect machine ingestion before public deployment.**
 
-## `GET /health`
+## Route reference
 
-Returns the service status for local health checks.
+### Public and identity routes
 
-```json
-{
-  "status": "ok",
-  "service": "shaktios-api"
-}
-```
+| Method / path | Access | Response |
+| --- | --- | --- |
+| `GET /health` | Public | `{ "status": "ok", "service": "shaktios-api" }`; not an Auth/provider/database readiness test |
+| `GET /venues` | Public | Array of registered venues with canonical zones |
+| `GET /venues/{venue_id}` | Public | Venue, or `404` |
+| `GET /public/overview` | Public | Database-wide counts and projected recent summaries; no report payloads or reporter identities |
+| `GET /me` | User | `{id, email, role, is_operator}` from verified identity/access rules |
+| `GET /integrations` | Operator | `{ "n8n": { "configured": boolean, "authenticated": boolean } }` |
 
-## `POST /events`
+Venue fields are `id`, `name`, `description`, `venue`, `locationLabel`, `status`, nullable `startTime`, `endTime`, `helpline`, and `zones`. Each zone has `id`, `label`, `latitude`, `longitude`. These are registry records, including labelled seed scenarios when seeded.
 
-Validates, persists, and logs one event, then returns the persisted normalized event. `id` and `timestamp` are generated when omitted.
+Public overview includes `incident_count`, `active_count`, `elevated_count`, `event_count`, `source_count`, `last_event_at`, `seeded_event_count`, up to 100 projected `incidents` and up to 12 `recent_events`. Counts cover the database; arrays are bounded. The landing page does **not** use this endpoint—it always shows static samples.
+
+Integration flags reflect the presence of a webhook URL and a server-side secret, **not** a live n8n authentication or delivery test. The server cannot establish that the remote secret matches merely from these flags.
+
+### Events, incidents and owned reports
+
+| Method / path | Access | Parameters / behavior |
+| --- | --- | --- |
+| `POST /events` | Type/source-dependent | Validates, stores, correlates when relevant and broadcasts; returns Event with `201` |
+| `GET /events` | Operator | `limit=50`, range 1–200; newest observations first |
+| `GET /incidents` | Operator | `limit=50`, range 1–200; most recently updated first |
+| `GET /incidents/{incident_id}` | Operator | Incident or `404` |
+| `GET /incidents/{incident_id}/events` | Operator | `limit=100`, range 1–200; oldest first, filtered by actual incident association; unknown incident → `404` |
+| `GET /incidents/{incident_id}/timeline` | Operator | `limit=100`, minimum 1; oldest first; unknown incident → `404`; no explicit upper limit in this route |
+| `GET /me/reports` | User | `limit=50`, range 1–100; `offset=0`, minimum 0; newest first; ownership filter applied **before** pagination |
+| `GET /me/reports/{report_id}` | User | Owned report; missing or unowned ID → `404` |
+
+List endpoints return arrays, not pagination envelopes. Only `/me/reports` currently exposes an offset. Do not present a bounded list as the complete database history.
+
+### Voice drafts
+
+| Method / path | Access | Behavior |
+| --- | --- | --- |
+| `GET /voice/config` | User | Provider-key presence, languages and recording/upload limits; not provider health |
+| `POST /voice/draft` | User | Multipart audio, selected venue, language and explicit consent → transcript and nullable suggested fields |
+
+Voice does not require operator access and does not store a report, infer GPS, broadcast operational events or call n8n. The full multipart contract, error codes, server-only configuration and process-local rate limits live in [VOICE_REPORTING.md](VOICE_REPORTING.md).
+
+## Event submission
+
+Machine signal example:
 
 ```json
 {
@@ -38,202 +69,125 @@ Validates, persists, and logs one event, then returns the persisted normalized e
   "source": "crowd_simulator",
   "location": "gate_4",
   "confidence": 0.95,
+  "payload": { "density": 0.42 }
+}
+```
+
+Event fields:
+
+| Field | Contract |
+| --- | --- |
+| `id` | String, UUID generated when omitted; duplicate stored ID → `409` |
+| `type`, `source`, `location` | Nonempty strings; source/type determine ingestion access rules |
+| `timestamp` | Datetime, generated in UTC when omitted; use timezone-aware timestamps |
+| `confidence` | Number from 0 to 1 |
+| `payload` | Object containing source-specific details |
+| `incident_id` | Nullable server-owned link assigned by correlation |
+| `reporter_id` | Nullable server-owned verified citizen identity; cleared for machine events |
+
+Citizen example, requiring a bearer token and the corresponding registered venue/zone (shown here from the optional Sonarpur seed):
+
+```json
+{
+  "type": "citizen_report",
+  "source": "citizen_app",
+  "location": "hackspire26_sonarpur_registration",
+  "confidence": 0.9,
   "payload": {
-    "density": 0.42
+    "venue_event_id": "venue-hackspire26-sonarpur",
+    "location_label": "Registration & Entry",
+    "category": "crowd",
+    "description": "Demo observation: queue is blocking the entrance.",
+    "urgency": "high",
+    "latitude": null,
+    "longitude": null,
+    "accuracy": null
   }
 }
 ```
 
-The response has status `201` and includes the generated `id` and UTC `timestamp`.
+For `citizen_report`, the server requires a valid session, `payload.venue_event_id` and a `location` zone belonging to that venue. Invalid venue/zone input returns `422`. It strips payload identity keys (`reporter_id`, `user_id`, `reporter`, `userId`), replaces top-level `reporter_id` with the verified JWT subject and ignores client-assigned incident links. The base Event model leaves the rest of the payload open; the mobile form's category/description/urgency validation is not a stricter server-side report schema.
 
-Authentication is via Supabase Auth: citizen clients send
-`Authorization: Bearer <supabase_access_token>`. The token is optional
-for machine signal sources, but a present-but-invalid token is rejected
-with `401`. For `citizen_report` events, any client-supplied identity is
-stripped and `reporter_id` is stamped server-side from the verified JWT
-`sub` (see `docs/SUPABASE.md`). Citizen reports require a valid session, `payload.venue_event_id`, and `location` equal to a zone ID belonging to that venue. `incident_id` is always server-owned; duplicate event IDs return `409`. Dashboard-prefixed sources additionally require operator capability. Non-citizen machine ingestion remains open for the local MVP; secure it before public deployment.
+An owned report response extends Event with nullable `incident_status`, `venue_name` and `report_status`. [DOMAIN.md](DOMAIN.md) owns the status mapping, correlation algorithm and risk formula. Report status is workflow state, not delivery confirmation.
 
-## `GET /events`
+## Incident response
 
-Returns persisted events ordered newest first. The optional `limit` query parameter defaults to `50`.
+An Incident contains `id`, `type`, `location`, nullable `latitude`/`longitude`, `status`, `severity`, `confidence`, `risk`, `factors`, `created_at` and `updated_at`. Current type is `crowd_risk`. Coordinates come from registered zones; missing coordinates remain null.
 
-```text
-GET /events?limit=10
-```
+`factors` contains the risk contributors and `citizen_report_count`. See [Domain](DOMAIN.md) rather than duplicating scoring thresholds here.
 
-## `GET /incidents`
+## Operator writes
 
-Returns incidents ordered by most recently updated. The optional `limit` parameter defaults to `50`.
+### `POST /incidents/{incident_id}/status`
 
-## `GET /incidents/{incident_id}`
-
-Returns one incident or `404` when it does not exist.
-
-## `GET /incidents/{incident_id}/timeline`
-
-Returns the incident's chronological timeline entries, oldest first. The optional `limit` defaults to `100`. A relevant event creates an `event.correlated` entry after it is associated with the incident.
-
-```json
-[
-  {
-    "id": "timeline-entry-id",
-    "incident_id": "incident-id",
-    "type": "event.correlated",
-    "timestamp": "2026-09-19T12:00:00Z",
-    "details": {
-      "event_id": "event-id",
-      "event_type": "crowd_density",
-      "source": "crowd_simulator",
-      "risk": 0.168,
-      "severity": "LOW"
-    }
-  }
-]
-```
-
-## `POST /incidents/{incident_id}/status`
-
-Records an operator-approved incident status transition and returns the updated incident. The request supports an optional note:
+Requires operator access. Request:
 
 ```json
 {
   "status": "ASSESSING",
-  "note": "Operator is reviewing evidence."
+  "note": "Operator is reviewing the demo evidence."
 }
 ```
 
-Allowed transitions are `DETECTED -> ASSESSING`, `ASSESSING -> RESPONDING` or `RESOLVED`, and `RESPONDING -> RESOLVED`. Invalid transitions return `409`. Each accepted transition creates a `status.changed` timeline entry and broadcasts the updated incident.
+Returns the updated Incident with `200`. Note is optional, at most 500 characters. Allowed transitions are defined in [Domain](DOMAIN.md): `DETECTED → ASSESSING`, `ASSESSING → RESPONDING` or `RESOLVED`, `RESPONDING → RESOLVED`. Unknown incident → `404`; invalid transition → `409`.
 
-## `POST /incidents/{incident_id}/actions`
+An accepted transition records `status.changed` with verified operator attribution and broadcasts the updated incident.
 
-Requests a human-approved action for an incident in `RESPONDING` status and forwards it to `N8N_WEBHOOK_URL`.
+### `POST /incidents/{incident_id}/actions`
+
+Requires operator access, an incident in `RESPONDING` and explicit human approval. Request:
 
 ```json
 {
   "type": "notify_operator",
-  "note": "Send the approved response."
+  "note": "Approved test handoff only; do not dispatch."
 }
 ```
 
-The endpoint returns `503` when the webhook URL is not configured, `502` when delivery fails, and `409` when the incident is not `RESPONDING`. The operator note is forwarded to n8n and successful delivery creates an `action.requested` timeline entry. This integration requests a workflow; it does not execute autonomous emergency action.
+Action `type` is a string of 1–100 characters; optional note is at most 500. Successful response is `200` with `{action_id, status: "accepted", incident}`. FastAPI sends action ID/type, note and incident to `N8N_WEBHOOK_URL`, optionally including `X-ShaktiOS-Webhook-Secret`.
 
-## `WS /ws/incidents`
+| Status | Meaning |
+| --- | --- |
+| `404` | Incident does not exist |
+| `409` | Incident is not `RESPONDING` |
+| `503` | Webhook URL is not configured |
+| `502` | Upstream rejection, HTTP/network failure or timeout; diagnostic text is sanitized |
 
-Both WebSocket routes require the first JSON message within five seconds to be `{"type":"authenticate","token":"<Supabase access token>"}`. Credentials must not be put in the URL. After operator verification the server sends `{"type":"authenticated"}`; invalid or non-operator sessions close with code `1008`. A connection is not live until this acknowledgement is received.
+A successful handoff records `action.requested` without resolving the incident. The dashboard requires both URL/secret flags before enabling approval; the API itself only requires a URL and includes the secret when configured. The supplied n8n workflow uses Header Auth, so configure both sides.
 
-Streams incident updates from the current API process. The connection remains open until the client disconnects. When an event creates or updates an incident, subscribers receive:
+**Acceptance is not notification delivery.** A timeout/failure may occur after n8n has started; there is no automatic retry or idempotency guarantee. Inspect execution history before retrying. Import, setup and detailed troubleshooting belong in the [n8n runbook](../n8n/README.md).
+
+## Timeline response
+
+Each entry has `id`, `incident_id`, `type`, `timestamp`, and a `details` object. Current types:
+
+- `event.correlated`: event ID/type/source and resulting risk/severity.
+- `status.changed`: previous/new state, optional note and verified operator attribution.
+- `action.requested`: action ID/type, accepted delivery marker, optional note and operator attribution.
+
+Synthetic seed entries include seed provenance instead of pretending a real operator approved them.
+
+## WebSocket protocol
+
+Both `WS /ws/events` and `WS /ws/incidents` are **operator-only**. After opening the socket, send this first message within five seconds:
 
 ```json
-{
-  "type": "incident.updated",
-  "incident": {
-    "id": "incident-id",
-    "type": "crowd_risk",
-    "location": "gate_4",
-    "status": "DETECTED",
-    "severity": "LOW",
-    "confidence": 0.95,
-    "risk": 0.168,
-    "factors": {},
-    "created_at": "2026-09-19T12:00:00Z",
-    "updated_at": "2026-09-19T12:00:00Z"
-  }
-}
+{"type":"authenticate","token":"<Supabase access token>"}
 ```
 
-This is intentionally an in-memory, single-process implementation for the MVP. It does not provide cross-process delivery or replay for clients that connect later.
-
-## `WS /ws/events`
-
-Streams normalized events from the current API process. When an event is persisted, subscribers receive:
+Never put credentials in the URL. After verifying identity and operator capability, the server replies:
 
 ```json
-{
-  "type": "event.created",
-  "event": {
-    "id": "event-id",
-    "type": "crowd_density",
-    "source": "crowd_simulator",
-    "timestamp": "2026-09-19T12:00:00Z",
-    "location": "gate_4",
-    "confidence": 0.95,
-    "payload": { "density": 0.42 }
-  }
-}
+{"type":"authenticated"}
 ```
 
-The event stream uses the same in-memory, single-process delivery model as the incident stream and does not provide replay.
+Invalid, missing, timed-out or non-operator authentication closes with code `1008`. Only mark a subscription live after acknowledgement. Subsequent frames are:
 
-Events with types `crowd_density`, `abnormal_movement`, `social_concern`, and `citizen_report` can create or update a `crowd_risk` incident when they share a location and fall within the recent correlation window. The window defaults to 300 seconds and can be changed with `INCIDENT_CORRELATION_WINDOW_SECONDS`.
+- `/ws/events`: `{ "type": "event.created", "event": <Event> }`
+- `/ws/incidents`: `{ "type": "incident.updated", "incident": <Incident> }`
 
-## Database schema
+Subscriptions are held in the current API process. There is no cross-process fanout or replay. Reconnect with a current token and reload HTTP snapshots; do not assume missed events will be resent.
 
-The API creates the `events` table on startup:
+## Schema and setup
 
-| Column | Type | Constraints |
-| --- | --- | --- |
-| `id` | `VARCHAR(36)` | Primary key |
-| `type` | `VARCHAR(255)` | Required |
-| `source` | `VARCHAR(255)` | Required |
-| `timestamp` | `TIMESTAMP WITH TIME ZONE` | Required |
-| `location` | `VARCHAR(255)` | Required |
-| `confidence` | `FLOAT` | Required, validated from `0.0` to `1.0` |
-| `payload` | `JSON` | Required |
-
-The API also creates the `incidents` table:
-
-| Column | Type | Constraints |
-| --- | --- | --- |
-| `id` | `VARCHAR(36)` | Primary key |
-| `type` | `VARCHAR(255)` | Required |
-| `location` | `VARCHAR(255)` | Required |
-| `status` | `VARCHAR(32)` | Required |
-| `severity` | `VARCHAR(32)` | Required |
-| `confidence` | `FLOAT` | Required, validated from `0.0` to `1.0` |
-| `risk` | `FLOAT` | Required, normalized from `0.0` to `1.0` |
-| `factors` | `JSON` | Required, explainable contributions |
-| `created_at` | `TIMESTAMP WITH TIME ZONE` | Required |
-| `updated_at` | `TIMESTAMP WITH TIME ZONE` | Required |
-
-The API also creates the `incident_timeline` table:
-
-| Column | Type | Constraints |
-| --- | --- | --- |
-| `id` | `VARCHAR(36)` | Primary key |
-| `incident_id` | `VARCHAR(36)` | Required, indexed |
-| `type` | `VARCHAR(64)` | Required |
-| `timestamp` | `TIMESTAMP WITH TIME ZONE` | Required |
-| `details` | `JSON` | Required |
-
-## Schema changes
-
-Run `supabase db push` from `shakti-os` to apply the authoritative SQL migrations. The venue/coordinate migration adds `venues`, `venue_zones`, and nullable incident `latitude`/`longitude`. It enables RLS on venue tables; clients use FastAPI rather than direct table access. Startup `create_all` supports isolated SQLite tests but does not alter existing columns. Do not reset the project to apply these changes. Supabase transaction pooling requires psycopg named preparation disabled (`prepare_threshold=None`), which the API engine configures.
-
-Incidents also expose the current explainable risk state:
-
-```json
-{
-  "risk": 0.408,
-  "severity": "MEDIUM",
-  "factors": {
-    "crowd_density": 0.42,
-    "social_velocity": 0.8,
-    "abnormal_movement": 0.0,
-    "citizen_reports": 0.0,
-    "citizen_report_count": 0
-  }
-}
-```
-
-The initial calculation is:
-
-```text
-risk = 0.4 * crowd_density
-     + 0.3 * social_velocity
-     + 0.2 * abnormal_movement
-     + 0.1 * citizen_reports
-```
-
-Severity thresholds are `LOW` below `0.40`, `MEDIUM` from `0.40`, `HIGH` from `0.70`, and `CRITICAL` from `0.85`. This is deterministic and explainable; it is not an AI or predictive model.
-
-The API runs locally on port `8000` by default and allows requests from the dashboard at `http://localhost:3000`.
+The SQL migrations, not this API guide, own database column definitions: see [SUPABASE.md](SUPABASE.md) and [`supabase/migrations`](../supabase/migrations). Local startup and client environment setup are in the [README](../README.md).

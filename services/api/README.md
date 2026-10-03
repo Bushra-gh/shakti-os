@@ -1,25 +1,27 @@
 # ShaktiOS API
 
-FastAPI service for Event, Incident, explainable Risk, realtime updates, timeline, approval, and action handoff workflows.
+FastAPI service for venue-backed reports, verified identity/ownership, Event persistence, Incident correlation, explainable Risk, timelines, operator decisions, authenticated realtime and optional voice/n8n integrations.
 
-Supabase PostgreSQL is the runtime database. Set `DATABASE_URL` to the
-Supabase pooler connection string (`...pooler.supabase.com:6543/postgres?sslmode=require`)
-and deploy the schema once with `supabase db push` (migrations live in
-`supabase/migrations/`). For an offline smoke test without Supabase, set
-`DATABASE_URL=sqlite+pysqlite:///./shaktios-local.db` before starting the
-server. The test suite uses isolated in-memory SQLite.
+## Setup and run
 
-Supabase Auth is the identity provider: citizen clients send
-`Authorization: Bearer <supabase_access_token>`; verification lives in
-`shaktios_api/auth.py`. `GET /me` returns the verified identity. Local runs
-also load the monorepo root `.env`; production should inject environment
-variables through the process manager.
-See `docs/SUPABASE.md` for the full auth, RLS, and migration workflow.
+Use the [monorepo setup](../../README.md#local-setup) for virtual-environment creation, dependency installation, client configuration and process startup. From `services/api` with its virtual environment active:
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[test]"
-# From services/api; ../../.env is the repository root env file.
-uvicorn shaktios_api.main:app --app-dir src --env-file ../../.env --reload --port 8000
+```bash
+python -m uvicorn shaktios_api.main:app --app-dir src --env-file ../../.env --reload --port 8000
 ```
+
+- Health: `http://localhost:8000/health`.
+- HTTP API explorer: `http://localhost:8000/docs`.
+- Root `.env` is loaded for local database configuration; explicit process variables take precedence.
+- Supabase PostgreSQL is the shared runtime database. Apply `supabase/migrations` using `supabase db push` before using it.
+- SQLite is accepted when explicitly configured for isolated tests/offline API smoke tests. It does not supply a complete offline Auth/client environment.
+
+## References
+
+- [API contract](../../docs/API.md): routes, access, response shapes and WS authentication.
+- [Domain](../../docs/DOMAIN.md): correlation, scoring and operator lifecycle.
+- [Supabase](../../docs/SUPABASE.md): environment, JWT verification, operator grants, ownership, migrations and RLS.
+- [Voice drafts](../../docs/VOICE_REPORTING.md), [n8n](../../n8n/README.md): optional provider boundaries.
+- [Architecture](../../docs/ARCHITECTURE.md): source-file navigation.
+
+Run `python -m pytest` from this directory after installing `.[test]`. The tests use isolated SQLite/mocked providers, not live Supabase/Sarvam/n8n acceptance. See [CONTRIBUTING.md](../../docs/CONTRIBUTING.md) for the other package checks.

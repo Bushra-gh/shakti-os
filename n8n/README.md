@@ -31,7 +31,7 @@ Action** only after configuring the required credential and approval policy.
 
    ```text
    N8N_WEBHOOK_URL=https://YOUR_N8N_HOST/webhook/shaktios/action
-   N8N_WEBHOOK_SECRET=change-this-demo-secret
+   N8N_WEBHOOK_SECRET=<YOUR_SERVER_ONLY_WEBHOOK_SECRET>
    ```
 
 8. Restart FastAPI. The API sends the secret as the
@@ -40,8 +40,9 @@ Action** only after configuring the required credential and approval policy.
 
 ## Test it
 
-An incident must be moved through `DETECTED → ASSESSING → RESPONDING` in the
-operator dashboard before an action can be requested.
+Sign in with an authorized operator account, then move an incident through
+`DETECTED → ASSESSING → RESPONDING` before requesting an action. See the
+[demo walkthrough](../docs/DEMO.md) for setup and citizen/status verification.
 
 Then click **Review & approve → Approve action**. A successful result should:
 

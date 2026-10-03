@@ -1,147 +1,148 @@
-# SHAKTIOS
+# ShaktiOS
 
-ShaktiOS is an event-driven intelligence and response platform. Its planned flow is:
-
-```text
-Signals -> Events -> Signal Fusion -> Risk Assessment -> Incident -> Human-approved Action -> Audit / Timeline
-```
-
-This repository is the bootstrap phase. It contains the architecture, development conventions, a minimal Next.js dashboard shell, a FastAPI Event, Incident, and explainable Risk foundation, shared frontend types, and a local crowd-event simulator. Product intelligence adapters, actions, WebSockets, authentication, and integrations are intentionally incremental.
-
-## Repository structure
+ShaktiOS connects citizen observations and machine signals to **explainable incidents, operator decisions, and an auditable response handoff**. It is a decision-support MVP, not an autonomous dispatcher or a certified emergency service.
 
 ```text
-apps/dashboard/                 Next.js frontend
-services/api/                   FastAPI backend
-intelligence/civic-shield/      Civic-Shield integration placeholder
-simulator/crowd/                Deterministic event simulator
-packages/types/                 Shared TypeScript event types
-packages/config/                Shared configuration placeholder
-docs/                           Architecture and workflow documentation
+Sources → Events → location/time correlation → Incidents + Risk
+                                               ↓
+                                  Human review → Action request → Timeline
 ```
 
-The repository also retains the shared ESLint, TypeScript, and UI packages from the initial Turborepo setup.
+## Two repositories, one platform
 
-For an evaluation-ready overview of the architecture, routes, database schema, demo flow, and current limitations, see [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md).
+| Repository / area | Responsibility |
+| --- | --- |
+| `shakti-os/apps/dashboard` | Next.js 16 / React 19 operator dashboard, Supabase login, incident evidence, Leaflet maps, decisions and timelines |
+| `shakti-os/services/api` | FastAPI, identity/access checks, venue registry, report ownership, correlation, risk, WebSockets and optional integrations |
+| `shakti-os/intelligence/` | Civic-Shield and citizen-report normalization packages |
+| `shakti-os/simulator/crowd` | Deterministic crowd signal generator |
+| `shakti-os/packages/` | Shared event types, ESLint/TypeScript configuration and configuration placeholder |
+| `shakti-os/supabase/migrations` | Authoritative PostgreSQL schema and RLS policies |
+| `shakti-os/scripts`, `shakti-os/n8n` | Seed utilities and an acknowledgement-only action workflow |
+| [`shaktios-app`](../shaktios-app/README.md) (separate sibling repo) | Expo 56 / React Native citizen app: sign-in, venue/QR joining, manual or voice-assisted reports, optional GPS and owned report status |
 
-## Prerequisites
+Both clients use Supabase **Auth** and call FastAPI for operational data. The mobile app is **not** a pnpm workspace package in this repo; install and run it separately.
 
-- Node.js 24+
-- pnpm 11+
-- Python 3.11+
-- A Supabase project (PostgreSQL + Auth) and the Supabase CLI
-- Docker is no longer required (no local database container)
+**Current boundaries:** the public landing page is labelled static sample content; the authenticated dashboard reads stored data. Seed scenarios are synthetic. Voice produces an editable draft, not a submitted report. n8n acknowledges an approved request; the supplied workflow does not notify or dispatch responders. See the [project overview](docs/PROJECT_OVERVIEW.md) for capabilities and limitations.
 
-## Setup
+## Local setup
 
-```powershell
-pnpm install
-Copy-Item .env.example .env
+Commands below run from `shakti-os` unless a `cd` is shown. They use a POSIX shell; Windows PowerShell equivalents are noted where needed.
+
+### 1. Prerequisites and configuration
+
+- Node.js **24+** and **pnpm 11.25.0** (the version pinned in `package.json`).
+- Python **3.11+** with virtual-environment support.
+- A Supabase project with PostgreSQL and Auth, plus the Supabase CLI for migrations.
+- Docker is not required for the hosted Supabase path; `docker-compose.yml` is not the current setup path.
+
+Install dependencies, then copy the template **only if a root `.env` does not already exist**:
+
+```bash
+pnpm install --frozen-lockfile
+# New checkout only; keep an existing configured .env:
+cp .env.example .env
 ```
 
-Fill in `.env` with your Supabase values (see `.env.example`):
+In PowerShell, use `Copy-Item .env.example .env` for that new-checkout step.
 
-```text
-DATABASE_URL=postgresql://postgres.YOUR_PROJECT_REF:...@...pooler.supabase.com:6543/postgres?sslmode=require
-SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-SUPABASE_PUBLISHABLE_KEY=...
-SUPABASE_PROJECT_REF=...
+Configure the root `.env` with your `DATABASE_URL` (Supabase connection string with `sslmode=require`), `SUPABASE_URL`, and the intended operator allowlist. Follow [Supabase setup](docs/SUPABASE.md) for Auth, pooler and migration details. Optional n8n and Sarvam credentials stay server-side.
+
+**Configure Next.js separately:** create an ignored `apps/dashboard/.env.local` containing only these public values:
+
+```dotenv
 NEXT_PUBLIC_API_URL=http://localhost:8000
-SHAKTIOS_API_URL=http://localhost:8000
-N8N_WEBHOOK_URL=
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
 ```
 
-`N8N_WEBHOOK_URL` is optional until the n8n workflow is hosted and activated. Import `n8n/shaktios-action-handoff.json` and follow [n8n/README.md](n8n/README.md) to configure the human-approved action handoff.
+Next.js loads environment files from `apps/dashboard`, not the monorepo root. The root template lists these values for reference but does not wire them into the dashboard. Never copy `DATABASE_URL`, webhook secrets, service-role credentials or provider keys into a client environment. Restart the dashboard after changing its environment; public values are embedded at build time.
 
-Apply the database schema (the single authoritative migration set):
+### 2. Install the API and apply migrations
 
-```powershell
+```bash
+cd services/api
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[test]"
+cd ../..
+
 supabase login
-supabase link --project-ref <SUPABASE_PROJECT_REF>
+supabase link --project-ref YOUR_PROJECT_REF
 supabase db push
 ```
 
-For an offline smoke test without Supabase, set `DATABASE_URL=sqlite+pysqlite:///./shaktios-local.db` before starting the API. SQLite is for smoke tests only — Supabase PostgreSQL is the runtime database.
+In PowerShell, create the environment with `python -m venv .venv` and activate with `.\.venv\Scripts\Activate.ps1` from `services/api`.
 
-Seed the database-backed venue registry and dashboard scenarios without truncating existing data:
+Apply migrations **before** starting against a shared database. SQLAlchemy startup table creation is not a replacement for migrations or RLS. For an isolated offline API smoke test, explicitly set `DATABASE_URL=sqlite+pysqlite:///./shaktios-local.db` in the API process; that does not provide Supabase Auth or a complete offline two-client demo.
 
-```powershell
-# From shakti-os, after installing services/api and applying migrations:
-services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --dry-run
-services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --apply
+### 3. Run the API and dashboard
+
+With the API virtual environment active:
+
+```bash
+cd services/api
+python -m uvicorn shaktios_api.main:app --app-dir src --env-file ../../.env --reload --port 8000
 ```
 
-The default is dry-run. A fresh full `--apply` inserts 4 labelled seed venues, 14 zones, 14 incidents, 98 events and 113 timeline entries in one transaction. Deterministic IDs are skipped on reruns; existing records are not overwritten. These are **synthetic seed scenarios stored in Supabase**, not live emergency observations. No Auth users, contacts, citizen identities, or n8n calls are created.
+Use `--host 0.0.0.0` only when a local emulator/device needs to reach this development server. Do not expose the unhardened API publicly.
 
-To add just the five Hackspire26 demo nodes near Sonarpur (without reapplying other scenarios):
+In a second terminal, from `shakti-os`:
 
-```powershell
-services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --venue venue-hackspire26-sonarpur --dry-run
-services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --venue venue-hackspire26-sonarpur --apply
-```
-
-This targeted seed adds one venue, five active incidents, 35 events and 39 timeline entries. Refresh the dashboard: the initial regional view includes both Kolkata and Sonarpur. Zoom in near `22.450, 88.421` to distinguish the nearby Sonarpur nodes. The app venue is **Hackspire26 — Sonarpur Seed Scenario**. Coordinates are illustrative, not an official campus plan.
-
-### Operator access
-
-Sign in using an existing Supabase email/password account. In the root `.env`, set `OPERATOR_USER_IDS=<your-user-uuid>` or `OPERATOR_EMAILS=<your-verified-email>` and restart FastAPI. Trusted `app_metadata.role` values `operator` and `admin` also grant access. `/me` must return `is_operator: true`; there is no demo-login bypass. Do not grant this capability to every citizen account.
-
-See [docs/REAL_DATA.md](docs/REAL_DATA.md) for data contracts, seed verification, smoke steps, and remaining external integrations.
-
-## Run the frontend
-
-Run the dashboard through Turborepo:
-
-```powershell
-pnpm dev
-```
-
-Or run it independently:
-
-```powershell
+```bash
 pnpm --filter @shaktios/dashboard dev
 ```
 
-Open `http://localhost:3000`.
+- Dashboard: `http://localhost:3000` (sample landing), `/login`, then `/dashboard`.
+- API: `http://localhost:8000/health`; interactive HTTP schema: `http://localhost:8000/docs`.
+- `pnpm dev` starts workspace development tasks, **not** the Python API or sibling Expo app.
 
-## Run the backend
+### 4. Authorize an operator and connect the citizen app
 
-```powershell
-cd services/api
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[test]"
-uvicorn shaktios_api.main:app --app-dir src --env-file ../../.env --reload --port 8000
+Use an existing Supabase email/password account. Configure **one trusted account** through root `OPERATOR_USER_IDS` or `OPERATOR_EMAILS`, then restart FastAPI. Trusted `app_metadata.role=operator|admin` also grants access. `GET /me` must return `is_operator: true`. There is no demo-login bypass; citizen sign-up must not grant operator capability.
+
+Follow the [citizen app README](../shaktios-app/README.md) in the sibling repo. Its `EXPO_PUBLIC_API_URL` must reach this API: `http://10.0.2.2:8000` for the Android emulator, the development machine's LAN address for a physical device, or `http://localhost:8000` for a browser on the same machine. Use the same Supabase project. Add the Expo **web** origin to backend `CORS_ORIGINS` when testing in a browser; native apps are not governed by browser CORS.
+
+### 5. Add optional demo data
+
+The database seed is explicit and defaults to a no-connection dry-run:
+
+```bash
+services/api/.venv/bin/python scripts/seed_supabase.py --dry-run
+# Only after confirming the intended database:
+services/api/.venv/bin/python scripts/seed_supabase.py --apply
 ```
 
-Run `supabase db push` once to deploy the schema before starting the server. Check `http://localhost:8000/health`. Events can be submitted to `POST http://localhost:8000/events` and read with `GET http://localhost:8000/events`; see [docs/API.md](docs/API.md). Supabase Auth is the identity provider for citizen clients; see [docs/SUPABASE.md](docs/SUPABASE.md).
+On Windows use `services/api/.venv/Scripts/python.exe`. Read the [seed runbook](docs/REAL_DATA.md) before applying; it documents fixture counts, the scoped Sonarpur scenario, rerun behavior and legacy script caveats. See [DEMO.md](docs/DEMO.md) for the actual citizen → operator → citizen-status walkthrough.
 
-## Run the simulator
+## Checks
 
-```powershell
-cd simulator/crowd
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e .
-python -m shaktios_crowd_simulator.main
-```
+From the monorepo root:
 
-The simulator sends one deterministic event to the API. Add `--dry-run` to print without sending, or set `SHAKTIOS_API_URL` to use another API base URL.
-
-The API and simulator use separate virtual environments. Run the simulator with `simulator/crowd/.venv\Scripts\python.exe`, not the API virtual environment.
-
-## Development commands
-
-```powershell
-pnpm dev
-pnpm build
+```bash
 pnpm lint
-pnpm test
 pnpm check-types
+pnpm test
+pnpm build
 ```
 
-Run API tests from `services/api` with `pytest` after installing the test extras.
+Run `python -m pytest` from `services/api` with its test dependencies installed. JavaScript workspace tests do not run Python or sibling mobile tests. [CONTRIBUTING.md](docs/CONTRIBUTING.md) lists package checks, current CI coverage and documentation-only validation.
 
-## Git workflow
+## Documentation map
 
-`main` is the stable branch. Use `feature/*`, `fix/*`, `docs/*`, or `chore/*` branches. Keep pull requests small, do not push directly to `main`, and avoid unrelated file changes. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
+| Need | Read |
+| --- | --- |
+| Product scope and both user experiences | [Project overview](docs/PROJECT_OVERVIEW.md) |
+| Components, data flow and code navigation | [Architecture](docs/ARCHITECTURE.md) |
+| Domain, correlation, risk and lifecycle rules | [Domain](docs/DOMAIN.md) |
+| HTTP routes, access, response shapes and WebSockets | [API](docs/API.md) |
+| Signal types, adapters and ingestion caveats | [Events](docs/EVENTS.md) |
+| Environment, Auth, schema, RLS and storage boundary | [Supabase](docs/SUPABASE.md) |
+| Synthetic fixtures and seed commands | [Seed runbook](docs/REAL_DATA.md) |
+| Rehearsal and acceptance walkthrough | [Demo](docs/DEMO.md) |
+| Optional integrations | [Voice drafts](docs/VOICE_REPORTING.md), [n8n handoff](n8n/README.md) |
+| Presentation narrative | [Presentation summary](PRESENTATION_SUMMARY.md) |
+| Engineering rationale and remaining work | [Decisions](docs/DECISIONS.md), [Tasks](docs/TASKS.md) |
+| Contribution expectations | [Contributing](docs/CONTRIBUTING.md), [Definition of done](docs/DEFINITION_OF_DONE.md) |
+
+Keep detailed contracts in their owning guide and link to them rather than maintaining another copy. Links to `shaktios-app` assume both repos are checked out as siblings; they do not make the app part of this workspace.

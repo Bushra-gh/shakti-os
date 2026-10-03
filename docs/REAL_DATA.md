@@ -1,55 +1,55 @@
-# Real-data MVP and seed runbook
+# Database-backed demo data and seed runbook
 
-## What is connected
+**Database-backed does not mean a live observation.** The dashboard and citizen app share FastAPI/Supabase data, but `scripts/seed_supabase.py` creates explicitly synthetic scenarios. The public landing page has separate static sample content and never polls the API.
 
-The dashboard and citizen app read the same FastAPI service and Supabase PostgreSQL database. Supabase Auth supplies identity; operational table access goes through FastAPI.
+Install/configure the system using the [README](../README.md), apply [Supabase migrations](SUPABASE.md), then use this guide if you need demo fixtures. For actual reporting and acceptance checks, see [DEMO.md](DEMO.md).
 
-- Landing page: always-populated static demo metrics, illustrative venue map, incident queue and activity feed. These marketing fixtures are labelled as sample data and never call or poll the API. The real operator dashboard remains database-backed.
-- Operator dashboard: authenticated incident/event reads, venue-zone coordinates, incident-linked evidence, real risk factors, timeline entries, status transitions, and n8n handoff requests. Profile display names are saved through Supabase Auth. Failed/unconfigured integrations are not presented as successful actions.
-- Citizen app: database venue picker, QR/manual joining, email/password Auth, zone-based reports with optional GPS, ownership-filtered report lists/details, backend-derived statuses and native selected-venue persistence. Unsupported photo-upload, notification and login controls were removed rather than simulated.
-- Realtime: operator JWT is sent as the first WebSocket message; the server acknowledges successful authorization before clients display LIVE. No token is placed in the URL. Reconnection reloads authoritative HTTP data.
+## Review before applying
 
-The dashboard operates on a recent snapshot of up to 200 incidents/events; per-incident evidence and timeline reads are bounded. This is an MVP, not an unbounded reporting/export system. The public overview counts the full database.
+From `shakti-os`, using the installed API virtual environment:
 
-## Setup
-
-1. Configure the root `.env` with the existing Supabase PostgreSQL `DATABASE_URL`, `SUPABASE_URL` and any n8n webhook settings. Keep database/service credentials out of frontend environment variables.
-2. Set dashboard `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SUPABASE_URL` and its publishable key. Set the mobile `EXPO_PUBLIC_*` equivalents. Android emulator API host: `http://10.0.2.2:8000`; browser: `http://localhost:8000`.
-3. Apply migrations:
-   ```powershell
-   supabase link --project-ref <your-project-ref>
-   supabase db push
-   ```
-4. Install the API, then seed from `shakti-os`:
-   ```powershell
-   services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --dry-run
-   services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --apply
-   ```
-5. Grant **a specific trusted existing account** operator capability via root `OPERATOR_USER_IDS` or `OPERATOR_EMAILS`, then restart FastAPI. Alternatively use trusted Supabase `app_metadata.role=operator|admin`. Citizen sign-up must not grant this role.
-6. Start the API and dashboard, then restart Expo/Metro after changing mobile environment variables.
-
-## Seed properties
-
-`scripts/seed_supabase.py` defaults to dry-run without a database connection. Applying requires a PostgreSQL connection and performs one transaction:
-
-- 4 seed scenario venues, 14 canonical zones (including five Hackspire26/Sonarpur nodes).
-- 14 isolated incidents across several severities and lifecycle stages.
-- 98 multi-source events and 113 evidence/status timeline entries on a fresh full seed.
-- UUID5 deterministic IDs, `seed_*` sources, payload `seed_batch=shaktios-seed-v2` and `is_seeded=true`.
-- No truncation, overwriting existing IDs, Auth users, fake citizen identity, phone contacts, attachment URLs, or webhook side effects.
-
-Existing deterministic IDs are skipped. Re-running is a no-op, not a timestamp refresh. Scenario coordinates are illustrative. Replace/register actual venues through an appropriate reviewed database workflow before real operations; an admin venue editor is not part of this MVP.
-
-### Hackspire26 / Sonarpur addition
-
-The [official HackSpire'26 guide](https://www.hackspire.tech/guide) lists FIEM Campus, Sonarpur as the venue. The following are **illustrative demo nodes near that area**, not the official campus layout or live conditions. No organizer/emergency contact numbers are invented or copied into the seed.
-
-```powershell
-services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --venue venue-hackspire26-sonarpur --dry-run
-services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --venue venue-hackspire26-sonarpur --apply
+```bash
+services/api/.venv/bin/python scripts/seed_supabase.py --dry-run
+# Run only after confirming the intended demo database:
+services/api/.venv/bin/python scripts/seed_supabase.py --apply
 ```
 
-| Node | Latitude | Longitude | Seeded state | Risk / severity |
+On Windows replace `services/api/.venv/bin/python` with `services/api/.venv/Scripts/python.exe`.
+
+- No option means **dry-run**. It prints the fixture plan without opening a database connection.
+- `--apply` uses the API database configuration (including root `.env`) and requires PostgreSQL, not SQLite.
+- Writes occur in one transaction. Existing deterministic IDs are skipped; existing records are not overwritten or truncated.
+- It creates no Auth users, contacts, fake citizen identities, attachment URLs or webhook calls.
+- A seed rerun is **not** a timestamp refresh, a reset of operator decisions or a general repair of partially missing fixture rows.
+
+## Fixture inventory
+
+A fresh complete v2 seed plans:
+
+| Record | Count |
+| --- | ---: |
+| Venues | 4 |
+| Canonical zones | 14 |
+| Incidents | 14 |
+| Events | 98 |
+| Timeline entries | 113 |
+
+IDs are deterministic UUID5 values. Events use `seed_*` sources and payload markers `seed_batch=shaktios-seed-v2`, `is_seeded=true`. Seeded timeline decisions explicitly state that no real operator action or dispatch occurred. Counts are **fixture counts**, not the totals of an existing database.
+
+Coordinates are illustrative, and venue helplines are not invented. Use reviewed venue/zone registration before real operations. There is no venue-admin editor in the MVP.
+
+## Scoped Hackspire26 / Sonarpur scenario
+
+The [official HackSpire'26 guide](https://www.hackspire.tech/guide) identifies FIEM Campus, Sonarpur. These nodes are illustrative demo locations near that area, **not an official campus plan or live conditions**.
+
+```bash
+services/api/.venv/bin/python scripts/seed_supabase.py --venue venue-hackspire26-sonarpur --dry-run
+services/api/.venv/bin/python scripts/seed_supabase.py --venue venue-hackspire26-sonarpur --apply
+```
+
+A fresh scoped application plans **1 venue, 5 zones, 5 active incidents, 35 events and 39 timeline entries**. The same skip-existing rules apply.
+
+| Node | Latitude | Longitude | Initial state | Initial risk / severity |
 | --- | --- | --- | --- | --- |
 | Registration & Entry | 22.4498 | 88.4205 | ASSESSING | 81.8% / HIGH |
 | Hacking Arena | 22.4506 | 88.4220 | DETECTED | 61.1% / MEDIUM |
@@ -57,37 +57,31 @@ services/api/.venv/Scripts/python.exe scripts/seed_supabase.py --venue venue-hac
 | Food & Rest Zone | 22.4507 | 88.4188 | ASSESSING | 35.9% / LOW |
 | Shuttle Arrival | 22.4484 | 88.4232 | DETECTED | 67.4% / MEDIUM |
 
-The targeted application committed **1 venue, 5 zones, 5 active incidents, 35 events and 39 timeline entries** to the configured Supabase database. A second application inserted zero records. Readback through PostgreSQL and the running venue/public-overview APIs verified all five incidents and coordinate pairs. The existing v2 ID namespace and previous records were preserved; no webhook was invoked.
+Mobile venue name: **Hackspire26 — Sonarpur Seed Scenario**. Manual join ID: `venue-hackspire26-sonarpur`. The registration zone used in the demo is `hackspire26_sonarpur_registration`.
 
-Refresh `/dashboard` or `/map` after SQL seeding (it does not emit in-process WebSocket updates). The initial map view includes **Kolkata and Sonarpur**, centered at **22.525, 88.39**, zoom **11**. Zoom in near **22.450, 88.421** to separate the nearby campus-area nodes. Incoming data does not reset a manually chosen view. You can also search incidents for `hackspire26`. On mobile, choose **Hackspire26 — Sonarpur Seed Scenario**, or join using `venue-hackspire26-sonarpur`.
+After SQL seeding, refresh `/dashboard` or `/map`: direct SQL writes do not emit in-process WebSocket updates. The initial regional map is centered at `22.525, 88.39`, zoom `11`, framing Kolkata and Sonarpur. Zoom near `22.450, 88.421` to distinguish nearby Sonarpur nodes. Incoming updates do not reset a manually chosen view.
 
-Risk/status values above are initial fixtures; operators may change incident state afterward. Seed reruns do not undo those decisions or refresh timestamps. `--venue` scopes both the dry-run plan and the transaction; omitting it selects every scenario.
+Seed incident timestamps are deliberately in the past. A new citizen report normally starts a fresh incident rather than joining an old seed incident. To demonstrate fusion, use the fresh matching-zone inputs in [DEMO.md](DEMO.md), not a rerun of the seed.
 
-### Earlier verification performed against the configured Supabase project
+## Verification checklist
 
-- Applied `20260923000000_real_venues_and_coordinates.sql`.
-- Applied the seed and repeated it; the second v2 application inserted zero records.
-- Retained existing database records. The initial seven seed events from this implementation also remain, explicitly labelled `shaktios-seed-v1`; the initial synthetic reporter ID was cleared and initial invented venue helplines were removed. Only records created by this implementation were corrected.
-- At verification: **3 venues, 9 zones, 98 total events, 28 total incidents**, including **70 seed events**. Totals can change when new reports arrive.
-- Confirmed the HTTP venue contract, seed-labelled venue names, null helplines and absence of payloads/reporter identity from public event summaries.
+1. Review dry-run counts and selected venue before any write.
+2. Apply only to the intended demo project with pending migrations already deployed.
+3. Read `/venues` and the authenticated dashboard; confirm seed-labelled names, registered zones and expected coordinates.
+4. Compare database/public-overview counts only with their own pre-application baseline; unrelated reports may already exist.
+5. A second application to an unchanged complete fixture set should insert zero records. It must not change existing operator state or create webhook executions.
+6. Keep synthetic data labelled in screenshots and presentations. A later user-submitted demo report is a real owned database record, not evidence of an actual emergency.
 
-## Smoke test
+Automated seed behavior is covered by `services/api/tests/test_real_data.py` and `test_hackspire_seed.py`. Tests do not verify the state of your hosted project; run the [two-client walkthrough](DEMO.md) for that.
 
-1. Open the landing page with the API stopped: its demo dashboard and sample pulse remain fully populated, with no API-status errors or polling. Open the real dashboard separately to verify authenticated operational data.
-2. Sign in to the dashboard as the authorized operator. `/me` must return `is_operator: true`. Unauthorized citizen sessions must not load operator pages.
-3. Sign in on mobile as a citizen, choose a venue and zone, submit an observation and note its returned ID.
-4. Check My Reports and report detail. A different citizen must receive `404` for that ID and must not see it in their list.
-5. In the dashboard, locate the report's actual `incident_id`, review evidence, then move Detected → Assessing → Responding/Resolved. Refresh the mobile list and verify status follows the database.
-6. If explicitly testing n8n, use a controlled test destination. A successful handoff means workflow acknowledgement, **not notification delivery or emergency dispatch**.
-7. Reload both clients and interrupt/reconnect the API. Verify session restoration, error/retry states and refreshed snapshots.
+## Legacy utilities: do not use as the current runbook
 
-## Checks and boundaries
+| Utility | Current caveat |
+| --- | --- |
+| `scripts/seed.py` | Posts mixed events without a token or registered citizen venue context; citizen submissions no longer satisfy the API contract |
+| `scripts/e2e_check.py` | Assumes anonymous operator reads/citizen writes; it is not a valid authenticated end-to-end acceptance check |
+| `scripts/reset_demo.py` | Destructively clears operational records; not part of safe additive setup |
+| `scripts/seed_kolkata_durga_puja.py` | Older scenario utility, not the supported venue/zone-registry seed path |
+| `python -m shaktios_api.migrate` | Legacy table creation, not the authoritative Supabase schema upgrade workflow |
 
-Automated checks cover API ownership/access rules, public redaction, venue/report serialization, coordinate correlation, seed rerun safety, status/action flows, frontend API/session/WebSocket boundaries, TypeScript, lint, Next production build and Expo Android export.
-
-Still requires runtime verification/configuration:
-
-- The chosen operator account's role/allowlist. No account was silently promoted.
-- Authenticated Android login/reload, camera and GPS flows on an actual running device. An Android export alone does not prove these flows.
-- Live camera/social sources, verified event/helpline registration and real notification-provider nodes. Existing n8n workflow is an acknowledgement-only handoff until extended.
-- Production hardening: machine signal ingestion is still unauthenticated for local integrations; WebSockets are single-process without replay; rate limiting and action idempotency are not implemented. Protect ingestion and use HTTPS before public deployment.
+These files remain unchanged. Use `seed_supabase.py` for fixtures, the API contract for authenticated submissions, and reviewed migrations rather than resets.
