@@ -14,19 +14,20 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from shaktios_api.auth import AuthUser, AuthError, get_current_user, get_operator_user, get_optional_user, is_operator, require_machine_key, verify_token
+from shaktios_api.api_models import Health, Integrations, Me, PublicOverview
 from shaktios_api.config import app_env, validate_config
 from shaktios_api.database import create_tables, get_db
 from shaktios_api.event_store import EventRecord, list_events, save_event
 from shaktios_api.incident_models import ActionDelivery, Incident, IncidentAction, IncidentStatus, IncidentStatusUpdate
 from shaktios_api.incident_store import IncidentRecord, correlate_event, get_incident, list_incidents
-from shaktios_api.models import Event
+from shaktios_api.models import CameraDetection, Event
 from shaktios_api.report_models import ReportEvent
 from shaktios_api.report_store import get_my_report, list_my_reports
 from shaktios_api.realtime import event_connections, incident_connections
 from shaktios_api.timeline_models import TimelineEntry
 from shaktios_api.timeline_store import add_timeline_entry, list_timeline_entries
 from shaktios_api.venue_models import Venue
-from shaktios_api.venue_store import get_venue, list_venues
+from shaktios_api.venue_store import get_venue, list_venues, zone_coordinates
 from shaktios_api.voice import router as voice_router
 from shaktios_api.priority import router as priority_router
 
@@ -68,12 +69,12 @@ app.add_middleware(
 )
 
 
-@app.get("/health")
+@app.get("/health", response_model=Health)
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "shaktios-api"}
 
 
-@app.get("/me")
+@app.get("/me", response_model=Me)
 def me(user: AuthUser = Depends(get_current_user)) -> dict[str, str | bool | None]:
     """Return the verified Supabase identity and operator capability."""
     return {"id": user.id, "email": user.email, "role": user.role, "is_operator": is_operator(user)}
@@ -82,6 +83,32 @@ def me(user: AuthUser = Depends(get_current_user)) -> dict[str, str | bool | Non
 # Client-supplied identity keys are never trusted. They are stripped from
 # citizen_report payloads; the verified JWT sub is stamped server-side.
 _UNTRUSTED_IDENTITY_KEYS = {"reporter_id", "user_id", "reporter", "userId"}
+
+
+async def _persist_event(db: Session, event: Event) -> Event:
+    """Persist, correlate, commit and broadcast one server-owned event."""
+    # Correlation is server-owned; a client cannot link to a chosen incident.
+    event.incident_id = None
+    if db.get(EventRecord, event.id) is not None:
+        raise HTTPException(status_code=409, detail="Event ID already exists")
+    try:
+        persisted_event = save_event(db, event)
+        event_record = db.get(EventRecord, persisted_event.id)
+        incident = correlate_event(db, persisted_event, event_record) if event_record is not None else None
+        if incident is not None:
+            persisted_event.incident_id = incident.id
+        # Event, risk, correlation and timeline succeed or roll back together.
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        if db.get(EventRecord, event.id) is not None:
+            raise HTTPException(status_code=409, detail="Event ID already exists") from None
+        raise HTTPException(status_code=503, detail="Event could not be stored") from None
+    if incident is not None:
+        await incident_connections.broadcast(incident)
+    await event_connections.broadcast(persisted_event)
+    logger.info("event_received", extra={"event_id": persisted_event.id, "event_type": persisted_event.type})
+    return persisted_event
 
 
 @app.post("/events", response_model=Event, status_code=201)
@@ -119,28 +146,39 @@ async def ingest_event(
             if event.source.strip().lower() in {"citizen_app", "citizen_report", "expo_app", "public_app", "seed_citizen_report"}:
                 raise HTTPException(status_code=422, detail="Citizen sources require citizen_report type and user authentication")
         event.reporter_id = None
-    # Correlation is server-owned; a client cannot link to a chosen incident.
-    event.incident_id = None
-    if db.get(EventRecord, event.id) is not None:
-        raise HTTPException(status_code=409, detail="Event ID already exists")
-    try:
-        persisted_event = save_event(db, event)
-        event_record = db.get(EventRecord, persisted_event.id)
-        incident = correlate_event(db, persisted_event, event_record) if event_record is not None else None
-        if incident is not None:
-            persisted_event.incident_id = incident.id
-        # Event, risk, correlation and timeline succeed or roll back together.
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        if db.get(EventRecord, event.id) is not None:
-            raise HTTPException(status_code=409, detail="Event ID already exists") from None
-        raise HTTPException(status_code=503, detail="Event could not be stored") from None
-    if incident is not None:
-        await incident_connections.broadcast(incident)
-    await event_connections.broadcast(persisted_event)
-    logger.info("event_received", extra={"event_id": persisted_event.id, "event_type": persisted_event.type})
-    return persisted_event
+    return await _persist_event(db, event)
+
+
+@app.post("/camera/detections", response_model=Event, status_code=201)
+async def ingest_camera_detection(
+    detection: CameraDetection,
+    db: Session = Depends(get_db),
+    _: AuthUser = Depends(get_operator_user),
+) -> Event:
+    """Accept an operator-authenticated local camera analysis result.
+
+    The browser owns the LAN camera connection. The API only accepts the
+    normalized detection and feeds it through the normal incident pipeline;
+    camera URLs and credentials are deliberately never sent to or stored by
+    this endpoint.
+    """
+    if zone_coordinates(db, detection.location) is None:
+        raise HTTPException(status_code=422, detail="Camera location must be a registered venue zone")
+    event = Event(
+        type="abnormal_movement",
+        source="camera_analytics",
+        location=detection.location,
+        confidence=detection.confidence,
+        payload={
+            "analysis": "frame_difference",
+            "camera_id": detection.camera_id,
+            "camera_name": detection.camera_name,
+            "change_score": detection.change_score,
+            "score": detection.change_score,
+            "threshold": detection.threshold,
+        },
+    )
+    return await _persist_event(db, event)
 
 
 async def authenticate_websocket(websocket: WebSocket) -> AuthUser:
@@ -241,7 +279,7 @@ def get_incident_events(
     return [Event.model_validate(record, from_attributes=True) for record in records]
 
 
-@app.get("/public/overview")
+@app.get("/public/overview", response_model=PublicOverview)
 def public_overview(db: Session = Depends(get_db)) -> dict[str, object]:
     incidents = list_incidents(db, 100)
     events = list_events(db, 100)
@@ -271,7 +309,7 @@ def public_overview(db: Session = Depends(get_db)) -> dict[str, object]:
     }
 
 
-@app.get("/integrations")
+@app.get("/integrations", response_model=Integrations)
 def integrations(_: AuthUser = Depends(get_operator_user)) -> dict[str, dict[str, bool]]:
     webhook_url = os.getenv("N8N_WEBHOOK_URL", "").strip()
     secret = os.getenv("N8N_WEBHOOK_SECRET", "").strip()

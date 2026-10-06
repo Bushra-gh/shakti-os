@@ -14,6 +14,7 @@ from starlette.formparsers import MultiPartException, MultiPartParser
 from starlette.requests import ClientDisconnect
 
 from shaktios_api.auth import AuthUser, get_current_user
+from shaktios_api.api_models import VoiceConfig
 from shaktios_api.database import get_db
 from shaktios_api.venue_store import get_venue
 from shaktios_api.voice_provider import ProviderError, VoiceDraft, api_key, create_draft
@@ -178,7 +179,7 @@ def _validate_form(form, total_bytes: int):
     return audio, AUDIO_TYPES[mime], venue_id, language_code
 
 
-@router.get("/config")
+@router.get("/config", response_model=VoiceConfig)
 def voice_config(response: Response, _: AuthUser = Depends(get_current_user)):
     response.headers["Cache-Control"] = "no-store"
     return {

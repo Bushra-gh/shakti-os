@@ -49,7 +49,7 @@ Voice is a separate draft-only branch: authenticated audio + consent → FastAPI
 | `n8n/shaktios-action-handoff.json`                                       | Importable acknowledgement-only workflow                                                  |
 | Sibling `shaktios-app/src/api/`, `src/store/`, `app/`                    | Citizen API client, session/draft/venue state and Expo Router screens                     |
 
-Bare Python filenames in the table are relative to `services/api/src/shaktios_api/`. `packages/types` shares the TypeScript Event shape; it is not a generated cross-repository SDK. Dashboard and mobile also maintain their own API types, so contract changes need caller checks in both repos.
+Bare Python filenames in the table are relative to `services/api/src/shaktios_api/`. `packages/types` exports generated TypeScript wire contracts for the dashboard; `scripts/generate_contracts.py` refreshes the independent mobile copy in `shaktios-app/src/types/contracts.ts`. Client-only state stays local. See [CONTRACTS.md](CONTRACTS.md).
 
 ## Storage and consistency
 

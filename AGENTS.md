@@ -40,6 +40,7 @@ Source
 - Do not change unrelated files.
 - Keep features small and testable.
 - Never silently change API contracts.
+- Treat FastAPI Pydantic models as the runtime contract source; regenerate both TypeScript client contract outputs after wire changes.
 - Run relevant tests after changes.
 - Run typecheck/lint for frontend changes.
 - Run pytest for backend changes.

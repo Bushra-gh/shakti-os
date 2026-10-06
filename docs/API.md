@@ -48,6 +48,14 @@ Integration flags reflect the presence of a webhook URL and a server-side secret
 | `GET /me/reports` | User | `limit=50`, range 1–100; `offset=0`, minimum 0; newest first; ownership filter applied **before** pagination |
 | `GET /me/reports/{report_id}` | User | Owned report; missing or unowned ID → `404` |
 
+### Local camera detections
+
+| Method / path | Access | Behavior |
+| --- | --- | --- |
+| `POST /camera/detections` | Operator | Accepts a normalized frame-change result from a browser-connected local camera and stores it as an `abnormal_movement` event with `source=camera_analytics` |
+
+The browser connects directly to a configured HTTP/MJPEG or other browser-compatible LAN feed. The API does not discover, proxy or store camera URLs or credentials. The request requires a registered venue zone and contains `camera_id`, `camera_name`, `location`, `change_score`, `threshold` and `confidence`. The server supplies the event timestamp and runs the normal correlation, risk, timeline and WebSocket flow. RTSP requires a separate local gateway that exposes a browser-compatible stream.
+
 List endpoints return arrays, not pagination envelopes. Only `/me/reports` currently exposes an offset. Do not present a bounded list as the complete database history.
 
 ### Voice drafts

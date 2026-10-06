@@ -1,6 +1,5 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -44,7 +43,7 @@ class Incident(BaseModel):
     severity: IncidentSeverity = IncidentSeverity.MEDIUM
     confidence: float = Field(ge=0.0, le=1.0)
     risk: float = Field(ge=0.0, le=1.0)
-    factors: dict[str, Any]
+    factors: dict[str, float | int]
     created_at: datetime
     updated_at: datetime
 

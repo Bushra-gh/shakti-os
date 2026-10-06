@@ -5,14 +5,12 @@ import os
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
-
 from shaktios_api.auth import AuthUser, get_current_user
+from shaktios_api.priority_models import PriorityAssessment, PriorityRequest
+from shaktios_api.report_contracts import CATEGORIES, URGENCIES
 from shaktios_api.voice import VoiceLimiter
 from shaktios_api.voice_provider import (
-    CATEGORIES,
     CHAT_URL,
-    URGENCIES,
     ProviderError,
     _decode_json,
     _provider_json,
@@ -24,22 +22,6 @@ limiter = VoiceLimiter()
 
 MAX_REASONS = 3
 MAX_REASON_CHARS = 120
-
-
-class PriorityRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    category: str
-    description: str = Field(min_length=1, max_length=500)
-    has_photo: bool = False
-
-
-class PriorityAssessment(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    suggested_urgency: str
-    priority: bool
-    reasons: list[str] = Field(max_length=MAX_REASONS)
 
 
 def _assessment_payload(category: str, description: str, has_photo: bool) -> dict:

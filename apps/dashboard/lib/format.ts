@@ -1,3 +1,10 @@
+import {
+  INCIDENT_SEVERITIES,
+  INCIDENT_STATUSES,
+  type IncidentSeverity,
+  type IncidentStatus,
+} from "@shaktios/types";
+
 export const label = (value: string) => value.replaceAll("_", " ");
 
 export function formatTime(value: string) {
@@ -27,7 +34,7 @@ export function riskPercent(risk: number) {
   return Math.round(risk * 100);
 }
 
-export type Severity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type Severity = IncidentSeverity;
 
 export function severityForRisk(risk: number): Severity {
   if (risk >= 0.85) return "CRITICAL";
@@ -36,11 +43,9 @@ export function severityForRisk(risk: number): Severity {
   return "LOW";
 }
 
-export const SEVERITIES: Severity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+export const SEVERITIES: Severity[] = [...INCIDENT_SEVERITIES];
 
-export const STATUSES = ["DETECTED", "ASSESSING", "RESPONDING", "RESOLVED"] as const;
-
-export type IncidentStatus = (typeof STATUSES)[number];
+export const STATUSES: IncidentStatus[] = [...INCIDENT_STATUSES];
 
 /** Allowed operator-approved transitions. Backend remains authoritative. */
 export const ALLOWED_TRANSITIONS: Record<IncidentStatus, IncidentStatus[]> = {

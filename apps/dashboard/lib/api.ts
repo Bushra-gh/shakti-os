@@ -1,101 +1,30 @@
+import type {
+  ActionDelivery,
+  CameraDetectionInput,
+  Event,
+  EventInput,
+  Incident,
+  Integrations,
+  Me,
+  PublicOverview,
+  TimelineEntry,
+  Venue,
+} from "@shaktios/types";
 import { accessToken } from "./supabase";
 import { apiUrl, apiConfigurationError } from "./config";
 export { apiUrl } from "./config";
-
-export type Incident = {
-  id: string;
-  type: string;
-  location: string;
-  status: string;
-  severity: string;
-  confidence: number;
-  risk: number;
-  factors: Record<string, number>;
-  created_at: string;
-  updated_at: string;
-  latitude: number | null;
-  longitude: number | null;
-};
-
-export type Event = {
-  id: string;
-  type: string;
-  source: string;
-  timestamp: string;
-  location: string;
-  confidence: number;
-  payload: Record<string, unknown>;
-  incident_id: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-};
-
-export type PublicOverviewIncident = Pick<
+export type {
+  ActionDelivery,
+  CameraDetectionInput,
+  Event,
+  EventInput,
   Incident,
-  "id" | "type" | "location" | "status" | "severity" | "risk" | "updated_at" | "latitude" | "longitude"
->;
-
-export type PublicOverviewEvent = {
-  id: string;
-  type: string;
-  source: string;
-  location: string;
-  timestamp: string;
-};
-
-export type PublicOverview = {
-  incident_count: number;
-  active_count: number;
-  elevated_count: number;
-  event_count: number;
-  source_count: number;
-  last_event_at: string | null;
-  incidents: PublicOverviewIncident[];
-  recent_events: PublicOverviewEvent[];
-  seeded_event_count: number;
-};
-
-export type TimelineEntry = {
-  id: string;
-  incident_id: string;
-  type: string;
-  timestamp: string;
-  details: Record<string, string | number>;
-};
-
-export type VenueZone = {
-  id: string;
-  label: string;
-  latitude: number;
-  longitude: number;
-};
-
-export type Venue = {
-  id: string;
-  name: string;
-  description: string;
-  venue: string;
-  locationLabel: string;
-  zones: VenueZone[];
-  status: string;
-  startTime: string | null;
-  endTime: string | null;
-  helpline: string | null;
-};
-
-export type Me = {
-  id: string;
-  email: string | null;
-  role: string;
-  is_operator: boolean;
-};
-
-export type Integrations = {
-  n8n: {
-    configured: boolean;
-    authenticated: boolean;
-  };
-};
+  Integrations,
+  Me,
+  PublicOverview,
+  TimelineEntry,
+  Venue,
+} from "@shaktios/types";
 
 export class ApiError extends Error {
   status: number;
@@ -193,15 +122,23 @@ export async function getIntegrations(): Promise<Integrations> {
   return response.json();
 }
 
-export async function submitEvent(
-  event: Omit<Event, "id" | "timestamp" | "incident_id">,
-): Promise<Event> {
+export async function submitEvent(event: EventInput): Promise<Event> {
   const response = await apiFetch(`${apiUrl}/events`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(event),
   });
   if (!response.ok) await throwForStatus(response, "Event submission failed");
+  return response.json();
+}
+
+export async function submitCameraDetection(input: CameraDetectionInput): Promise<Event> {
+  const response = await apiFetch(`${apiUrl}/camera/detections`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) await throwForStatus(response, "Camera detection submission failed");
   return response.json();
 }
 
@@ -219,7 +156,7 @@ export async function requestIncidentAction(
   incidentId: string,
   type: string,
   note?: string,
-): Promise<{ action_id: string; status: string; incident: Incident }> {
+): Promise<ActionDelivery> {
   const response = await apiFetch(`${apiUrl}/incidents/${incidentId}/actions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

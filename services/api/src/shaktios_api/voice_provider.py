@@ -10,14 +10,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.datastructures import UploadFile
 
 from shaktios_api.venue_models import Venue
+from shaktios_api.report_contracts import CATEGORIES, URGENCIES, Category, Urgency
 
-Category = Literal[
-    "crowd", "medical", "lost_person", "fire_smoke", "suspicious", "violence",
-    "infrastructure", "other",
-]
-Urgency = Literal["low", "medium", "high"]
-CATEGORIES = ("crowd", "medical", "lost_person", "fire_smoke", "suspicious", "violence", "infrastructure", "other")
-URGENCIES = ("low", "medium", "high")
 MAX_PROVIDER_BYTES = 128 * 1024
 MAX_TRANSCRIPT_CHARS = 8000
 PROVIDER_TIMEOUT_SECONDS = 35

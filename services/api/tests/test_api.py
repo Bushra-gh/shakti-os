@@ -105,6 +105,44 @@ def test_event_is_persisted(client: TestClient) -> None:
     assert record.payload == {"density": 0.42}
 
 
+def test_operator_camera_detection_uses_normal_event_pipeline(client: TestClient) -> None:
+    response = client.post(
+        "/camera/detections",
+        json={
+            "camera_id": "camera-gate-4",
+            "camera_name": "Gate 4 camera",
+            "location": "gate_4",
+            "change_score": 0.42,
+            "threshold": 0.12,
+            "confidence": 0.75,
+        },
+    )
+
+    assert response.status_code == 201
+    event = response.json()
+    assert event["type"] == "abnormal_movement"
+    assert event["source"] == "camera_analytics"
+    assert event["location"] == "gate_4"
+    assert event["payload"]["analysis"] == "frame_difference"
+    assert event["payload"]["camera_id"] == "camera-gate-4"
+
+
+def test_camera_detection_requires_registered_zone(client: TestClient) -> None:
+    response = client.post(
+        "/camera/detections",
+        json={
+            "camera_id": "camera-unknown",
+            "camera_name": "Unknown camera",
+            "location": "unknown-zone",
+            "change_score": 0.42,
+            "threshold": 0.12,
+            "confidence": 0.75,
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_event_creates_incident(client: TestClient) -> None:
     response = client.post(
         "/events",

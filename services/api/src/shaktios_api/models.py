@@ -20,3 +20,16 @@ class Event(BaseModel):
     # citizen_report. Set server-side only — never from client input.
     # None for trusted machine signals and explicitly labelled direct-SQL fixtures.
     reporter_id: str | None = Field(default=None, max_length=255)
+
+
+class CameraDetection(BaseModel):
+    """A browser-side camera analysis result submitted by an operator."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    camera_id: str = Field(min_length=1, max_length=100)
+    camera_name: str = Field(min_length=1, max_length=255)
+    location: str = Field(min_length=1, max_length=255)
+    change_score: float = Field(ge=0.0, le=1.0)
+    threshold: float = Field(ge=0.0, le=1.0)
+    confidence: float = Field(ge=0.0, le=1.0)

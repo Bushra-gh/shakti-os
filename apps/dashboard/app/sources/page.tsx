@@ -5,6 +5,7 @@ import { Activity, Radio, Smartphone, Users, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OperatorShell } from "@/components/dashboard/shell";
+import { CameraMonitor } from "@/components/dashboard/camera-monitor";
 import { EmptyState, ErrorState, CardSkeleton } from "@/components/dashboard/states";
 import { useShaktiData } from "@/hooks/use-shakti";
 import { formatFullDateTime, label, sourceMeta, timeAgo } from "@/lib/format";
@@ -34,7 +35,7 @@ const BOUNDARY_NOTES: Array<{ title: string; body: string }> = [
 ];
 
 export default function SourcesPage() {
-  const { events, loading, error, refresh } = useShaktiData();
+  const { events, venues, loading, error, refresh } = useShaktiData();
 
   const groups = useMemo(() => {
     const map = new Map<string, typeof events>();
@@ -62,6 +63,8 @@ export default function SourcesPage() {
           Observed activity in the latest 200 events — not connector health or connection status.
         </p>
       </div>
+
+      <CameraMonitor venues={venues} />
 
       {loading && (
         <div className="grid gap-4 sm:grid-cols-2">

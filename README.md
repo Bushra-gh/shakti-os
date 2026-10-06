@@ -143,6 +143,7 @@ Run `python -m pytest` from `services/api` with its test dependencies installed.
 | Optional integrations | [Voice drafts](docs/VOICE_REPORTING.md), [n8n handoff](n8n/README.md) |
 | Presentation narrative | [Presentation summary](PRESENTATION_SUMMARY.md) |
 | Engineering rationale and remaining work | [Decisions](docs/DECISIONS.md), [Tasks](docs/TASKS.md) |
+| API contract ownership and regeneration | [Contracts](docs/CONTRACTS.md) |
 | Contribution expectations | [Contributing](docs/CONTRIBUTING.md), [Definition of done](docs/DEFINITION_OF_DONE.md) |
 
 Keep detailed contracts in their owning guide and link to them rather than maintaining another copy. Links to `shaktios-app` assume both repos are checked out as siblings; they do not make the app part of this workspace.
