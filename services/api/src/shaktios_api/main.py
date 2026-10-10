@@ -30,6 +30,7 @@ from shaktios_api.venue_models import Venue
 from shaktios_api.venue_store import get_venue, list_venues, zone_coordinates
 from shaktios_api.voice import router as voice_router
 from shaktios_api.priority import router as priority_router
+from shaktios_api.gemma_assist import router as gemma_router
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="ShaktiOS API", version="0.1.0", lifespan=lifespan)
 app.include_router(voice_router)
 app.include_router(priority_router)
+app.include_router(gemma_router)
 
 
 @app.exception_handler(SQLAlchemyError)

@@ -35,6 +35,13 @@ export interface Event {
   reporter_id: string | null;
 }
 
+export interface GemmaConfig {
+  configured: boolean;
+  provider: "gemini-api";
+  model: string;
+  multimodal: true;
+}
+
 export interface Health {
   status: "ok";
   service: "shaktios-api";
@@ -58,6 +65,21 @@ export interface Incident {
 export interface IncidentAction {
   type: string;
   note?: string | null;
+}
+
+export interface IncidentBrief {
+  brief: string;
+  bullets: Array<string>;
+  suggested_actions: Array<string>;
+  model: string;
+}
+
+export interface IncidentBriefRequest {
+  location: string;
+  status: string;
+  severity: string;
+  risk: number;
+  evidence?: Array<string>;
 }
 
 export const CATEGORY_IDS = ["crowd", "medical", "lost_person", "fire_smoke", "suspicious", "violence", "infrastructure", "other"] as const;
@@ -88,6 +110,21 @@ export interface Me {
 export interface N8nIntegration {
   configured: boolean;
   authenticated: boolean;
+}
+
+export interface PhotoTriageRequest {
+  category: "crowd" | "medical" | "lost_person" | "fire_smoke" | "suspicious" | "violence" | "infrastructure" | "other";
+  description: string;
+  image_base64?: string | null;
+  mime_type?: "image/jpeg" | "image/png" | "image/webp";
+}
+
+export interface PhotoTriageResponse {
+  suggested_urgency: "low" | "medium" | "high";
+  priority: boolean;
+  reasons: Array<string>;
+  visual_findings: Array<string>;
+  model: string;
 }
 
 export interface PriorityAssessment {

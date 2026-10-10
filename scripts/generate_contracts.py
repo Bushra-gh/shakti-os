@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "services/api/src"))
 from pydantic import BaseModel, TypeAdapter
 
 from shaktios_api.api_models import Health, Integrations, Me, PublicOverview, VoiceConfig
+from shaktios_api.gemma_models import GemmaConfig, IncidentBrief, IncidentBriefRequest, PhotoTriageRequest, PhotoTriageResponse
 from shaktios_api.incident_models import ActionDelivery, Incident, IncidentAction, IncidentStatusUpdate
 from shaktios_api.models import CameraDetection, Event
 from shaktios_api.priority_models import PriorityAssessment, PriorityRequest
@@ -30,8 +31,9 @@ from shaktios_api.voice_provider import VoiceDraft
 OUTPUT_MODELS = (
     Event, Incident, ReportEvent, Venue, TimelineEntry, ActionDelivery, Health,
     Me, Integrations, PublicOverview, VoiceConfig, VoiceDraft, PriorityAssessment,
+    GemmaConfig, PhotoTriageResponse, IncidentBrief,
 )
-INPUT_MODELS = (CameraDetection, IncidentStatusUpdate, IncidentAction, PriorityRequest)
+INPUT_MODELS = (CameraDetection, IncidentStatusUpdate, IncidentAction, PriorityRequest, PhotoTriageRequest, IncidentBriefRequest)
 
 
 def ts_type(schema: dict) -> str:
